@@ -1837,12 +1837,28 @@
     nil))
 
 (defvar *print-proof* t)
+(defvar *print-trail* t)
+(defvar *print-success-notification* t)
+(defvar *single-solution* nil)
+(defvar *number-of-solutions-found* 0)
 
 (defvar *print-proof-time* 0)
 
 (defun query-success (!level!)
   (declare (ignore !level!))
-  nil)
+  (let ((*print-readably* t)
+	(*print-circle* t))
+    (when *print-success-notification*
+      (if *print-trail*
+	  (format t "~&Success:  trail = ~A,~%~4Ttrail-array = ~W.~%"
+		  *trail*
+                  (make-array `(,(1+ *trail*))
+                              :displaced-to *trail-array*))
+	  (format t "~&Success."))))
+    (incf *number-of-solutions-found*)
+  (if *single-solution*
+      (throw 'query t)
+      nil))
 
 (defun query (&optional variables goal &rest options)
   (when goal
@@ -1853,7 +1869,8 @@
     (setq *trace-search-time* 0)
     (setq *print-proof-time* 0)
     (setq start-time (get-internal-run-time))
-    (setq value (query/0 0 #'query-success))
+    (setq value (catch 'query 
+		  (query/0 0 #'query-success)))
     (setq stop-time (get-internal-run-time))
     (when (> *ncalls* 0)
       (setq time

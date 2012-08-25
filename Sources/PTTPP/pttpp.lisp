@@ -7,24 +7,16 @@
 ;;; in the root directory for further information.
 
 (in-package #:pttpp)
-#+SYMBOLICS (import 'user::stack-let)
-#+SYMBOLICS (import 'user::stack-let*)
 
 (eval-when (eval compile load)
   (setq *print-radix* nil))
 
-#-SYMBOLICS
 (eval-when (eval compile load)
   (defmacro stack-let (bindings &body body)
     ;; stack-let on the 3600 is like let except variable values are
     ;; consed on the stack, not in the heap thereby diminishing
     ;; allocation/deallocation costs
     `(let ,bindings . ,body)))
-
-#+SYMBOLICS
-(eval-when (eval compile load)
-  (defmacro assert (&rest args)
-    `(user::assert ,@args)))
 
 (defvar float-internal-time-units-per-second
   (float internal-time-units-per-second))
@@ -744,14 +736,10 @@
            (begin-search
             !arg2! !arg2! nil !level!
             #'(lambda (lev)
-                #+(OR SYMBOLICS TI)
-                (declare (sys:downward-function))
                 (apply (car !arg1!)
                        (append (cdr !arg1!)	; inefficient
                                (list lev
                                      #'(lambda (lev)
-                                         #+(OR SYMBOLICS TI)
-                                         (declare (sys:downward-function))
                                          (declare (ignore lev))
                                          (undo-bindings)
                                          (return-from not-solvable nil)))))))
@@ -1242,12 +1230,10 @@
                              (eq (caddr continuation) '!level!))
 			(cadr continuation)
 			`(function (lambda (!new-level!)
-                           #+(OR SYMBOLICS TI) (declare (sys:downward-function))
                            ;; WARNING: PUT !LEVEL! INSIDE MACRO IF NO SUBST DESIRED
                            ,(subst '!new-level! '!level! continuation))))))))
 
 (defun compile-clause-body (body vars unbound)
-  #+SYMBOLICS (declare (special *clausenum*))
   (if (equal body '(true/0))
       ;;  automatically cut if unit clause subsumes goal
       (setq body '?!))
@@ -1260,8 +1246,8 @@
              (wrap-pop-ancestor
               (wrap-exit-redo-trace
                `(funcall !continuation! !level!))))))
-    `(PROGN #+SYMBOLICS (setq !nsubgoals! '(,length ,*clausenum*))
-	    ,(wrap-count-calls (wrap-push-ancestor (wrap-undo-bindings x))))))
+    `(progn 
+       ,(wrap-count-calls (wrap-push-ancestor (wrap-undo-bindings x))))))
 
 (defun compile-clause1 (headpats headlocs body vars unbound trail-is-nil)
   (cond ((null headpats)
@@ -1651,8 +1637,7 @@
       (setq arglist
             (append (head-locs arity) '(!level! !continuation!)))
       (setq auxlist
-            (append arglist '(&aux (!old-trail! *trail*)
-                              #+SYMBOLICS !nsubgoals!)))
+            (append arglist '(&aux (!old-trail! *trail*))))
       (when (or (not allow-repeated-goals) (not incomplete-inference))
 	(eval `(defvar ,(ancestors-name name) nil))
 	(eval `(defvar ,(ancestors-name (negated-functor name)) nil)))
@@ -1852,12 +1837,6 @@
 
 (defun query-success (!level!)
   (declare (ignore !level!))
-  #+SYMBOLICS
-  (let ((start-time (get-internal-run-time)))
-    (when *print-proof*
-      (scl:condition-bind ((print-proof 'print-proof))
-        (scl:signal 'print-proof)))
-    (incf *print-proof-time* (- (get-internal-run-time) start-time)))
   nil)
 
 (defun query (&optional variables goal &rest options)
@@ -2058,9 +2037,7 @@
 ;; printing due to bug in DBG:FRAME-LOCAL-VALUE that causes an error if named
 ;; variable isn't found
 
-(defun call/1 (x !level! !continuation!
-               #+SYMBOLICS &aux #+SYMBOLICS (!nsubgoals! '(1 nil)))
-  #+SYMBOLICS (declare (ignore !nsubgoals!))
+(defun call/1 (x !level! !continuation!)
   (incf !level!)
   (dereference x
     :if-variable (error "CALL was given non-compound argument ~A" x)
@@ -2069,63 +2046,45 @@
                         ;; inefficient
                         (append (cdr x) (list !level! !continuation!)))))
 
-(defun not/1 (x !level! !continuation!
-              #+SYMBOLICS &aux #+SYMBOLICS (!nsubgoals! '(0 nil)))
-  #+SYMBOLICS (declare (ignore !nsubgoals!))
+(defun not/1 (x !level! !continuation!)
   (not-solvable x 1000000 !level! !continuation!))
 
-(defun not/2 (x y !level! !continuation!
-              #+SYMBOLICS &aux #+SYMBOLICS (!nsubgoals! '(0 nil)))
-  #+SYMBOLICS (declare (ignore !nsubgoals!))
+(defun not/2 (x y !level! !continuation!)
   (not-solvable x y !level! !continuation!))
 
-(defun y-or-n-p/0 (!level! !continuation!
-                   #+SYMBOLICS &aux #+SYMBOLICS (!nsubgoals! '(0 nil)))
-  #+SYMBOLICS (declare (ignore !nsubgoals!))
+(defun y-or-n-p/0 (!level! !continuation!)
   (incf !level!)
   (if (y-or-n-p)
       (funcall !continuation! !level!)
       nil))
 
-(defun y-or-n-p/1 (x !level! !continuation!
-                   #+SYMBOLICS &aux #+SYMBOLICS (!nsubgoals! '(0 nil)))
-  #+SYMBOLICS (declare (ignore !nsubgoals!))
+(defun y-or-n-p/1 (x !level! !continuation!)
   (incf !level!)
   (fresh-line) (write-term x) (princ "? ")
   (if (y-or-n-p)
       (funcall !continuation! !level!)
       nil))
 
-(defun atomic/1 (x !level! !continuation!
-                 #+SYMBOLICS &aux #+SYMBOLICS (!nsubgoals! '(0 nil)))
-  #+SYMBOLICS (declare (ignore !nsubgoals!))
+(defun atomic/1 (x !level! !continuation!)
   (incf !level!)
   (and (dereference x) (funcall !continuation! !level!)))
 
-(defun atom/1 (x !level! !continuation!
-               #+SYMBOLICS &aux #+SYMBOLICS (!nsubgoals! '(0 nil)))
-  #+SYMBOLICS (declare (ignore !nsubgoals!))
+(defun atom/1 (x !level! !continuation!)
   (incf !level!)
   (and (dereference x) (symbolp x) (funcall !continuation! !level!)))
 
-(defun integer/1 (x !level! !continuation!
-                  #+SYMBOLICS &aux #+SYMBOLICS (!nsubgoals! '(0 nil)))
-  #+SYMBOLICS (declare (ignore !nsubgoals!))
+(defun integer/1 (x !level! !continuation!)
   (incf !level!)
   (and (dereference x) (integerp x) (funcall !continuation! !level!)))
 
-(defun var/1 (x !level! !continuation!
-              #+SYMBOLICS &aux #+SYMBOLICS (!nsubgoals! '(0 nil)))
-  #+SYMBOLICS (declare (ignore !nsubgoals!))
+(defun var/1 (x !level! !continuation!)
   (incf !level!)
   (dereference x
     :if-constant  nil
     :if-variable  (funcall !continuation! !level!)
     :if-compound  nil))
 
-(defun nonvar/1 (x !level! !continuation!
-                 #+SYMBOLICS &aux #+SYMBOLICS (!nsubgoals! '(0 nil)))
-  #+SYMBOLICS (DECLARE (IGNORE !NSUBGOALS!))
+(defun nonvar/1 (x !level! !continuation!)
   (incf !level!)
   (dereference x
     :if-constant  (funcall !continuation! !level!)
@@ -2133,9 +2092,7 @@
     :if-compound  (funcall !continuation! !level!)))
 
 (defun functor/3 (term functor arity !level! !continuation!
-                  &aux (!old-trail! *trail*)
-                       #+SYMBOLICS (!nsubgoals! '(0 nil)))
-  #+SYMBOLICS (declare (ignore !nsubgoals!))
+                  &aux (!old-trail! *trail*))
   (incf !level!)
   (dereference
       term
@@ -2195,9 +2152,7 @@
       (funcall !continuation! !level!) (undo-bindings))))
 
 (defun arg/3 (index term arg !level! !continuation!
-              &aux (!old-trail! *trail*)
-                   #+SYMBOLICS (!nsubgoals! '(0 nil)))
-  #+SYMBOLICS (declare (ignore !nsubgoals!))
+              &aux (!old-trail! *trail*))
   (incf !level!)
   (dereference term
     :if-variable  (error "ARG was given non-compound second argument ~A" term)
@@ -2217,9 +2172,7 @@
                                (undo-bindings)))))))
 
 (defun is/2 (x y !level! !continuation!
-             &aux (!old-trail! *trail*)
-                  #+SYMBOLICS (!nsubgoals! '(0 nil)))
-  #+SYMBOLICS (declare (ignore !nsubgoals!))
+             &aux (!old-trail! *trail*))
   (incf !level!)
   (labels ((evaluate (term)
              (if (dereference term)
@@ -2240,81 +2193,62 @@
         (undo-bindings)))))
 
 (defun =/2 (x y !level! !continuation!
-            &aux (!old-trail! *trail*) #+SYMBOLICS (!nsubgoals! '(0 nil)))
-  #+SYMBOLICS (declare (ignore !nsubgoals!))
+            &aux (!old-trail! *trail*))
   (incf !level!)
   (when (always-trails-unify x y !old-trail!)
     (funcall !continuation! !level!)
     (undo-bindings)))
 
-(defun \\=/2 (x y !level! !continuation!
-              &aux (!old-trail! *trail*) #+SYMBOLICS (!nsubgoals! '(0 nil)))
-  #+SYMBOLICS (declare (ignore !nsubgoals!))
+(defun \\=/2 (x y !level! !continuation! &aux (!old-trail! *trail*))
   (incf !level!)
   (if (always-trails-unify x y !old-trail!)
       (undo-bindings)
       (funcall !continuation! !level!)))
 
-(defun unsafe-=/2 (x y !level! !continuation!
-                   &aux (!old-trail! *trail*) #+SYMBOLICS (!nsubgoals! '(0 nil)))
-  #+SYMBOLICS (declare (ignore !nsubgoals!))
+(defun unsafe-=/2 (x y !level! !continuation! &aux (!old-trail! *trail*))
   (incf !level!)
   (when (unsafe-always-trails-unify x y !old-trail!)
     (funcall !continuation! !level!)
     (undo-bindings)))
 
-(defun unsafe-\\=/2 (x y !level! !continuation!
-                     &aux (!old-trail! *trail*) #+SYMBOLICS (!nsubgoals! '(0 nil)))
-  #+SYMBOLICS (declare (ignore !nsubgoals!))
+(defun unsafe-\\=/2 (x y !level! !continuation! &aux (!old-trail! *trail*))
   (incf !level!)
   (if (unsafe-always-trails-unify x y !old-trail!)
       (undo-bindings)
       (funcall !continuation! !level!)))
 
-(defun ==/2 (x y !level! !continuation!
-             #+SYMBOLICS &aux #+SYMBOLICS (!nsubgoals! '(0 nil)))
-  #+SYMBOLICS (declare (ignore !nsubgoals!))
+(defun ==/2 (x y !level! !continuation!)
   (incf !level!)
   (and (identical x y)
        (funcall !continuation! !level!)))
 
-(defun \\==/2 (x y !level! !continuation!
-               #+SYMBOLICS &aux #+SYMBOLICS (!nsubgoals! '(0 nil)))
-  #+SYMBOLICS (declare (ignore !nsubgoals!))
+(defun \\==/2 (x y !level! !continuation!)
   (incf !level!)
   (and (not (identical x y))
        (funcall !continuation! !level!)))
 
-(defun >/2 (x y !level! !continuation!
-            #+SYMBOLICS &aux #+SYMBOLICS (!nsubgoals! '(0 nil)))
-  #+SYMBOLICS (declare (ignore !nsubgoals!))
+(defun >/2 (x y !level! !continuation!)
   (incf !level!)
   (and (dereference x)
        (dereference y)
        (> x y)
        (funcall !continuation! !level!)))
 
-(defun </2 (x y !level! !continuation!
-            #+SYMBOLICS &aux #+SYMBOLICS (!nsubgoals! '(0 nil)))
-  #+SYMBOLICS (declare (ignore !nsubgoals!))
+(defun </2 (x y !level! !continuation!)
   (incf !level!)
   (and (dereference x)
        (dereference y)
        (< x y)
        (funcall !continuation! !level!)))
 
-(defun >=/2 (x y !level! !continuation!
-             #+SYMBOLICS &aux #+SYMBOLICS (!nsubgoals! '(0 nil)))
-  #+SYMBOLICS (declare (ignore !nsubgoals!))
+(defun >=/2 (x y !level! !continuation!)
   (incf !level!)
   (and (dereference x)
        (dereference y)
        (>= x y)
        (funcall !continuation! !level!)))
 
-(defun =</2 (x y !level! !continuation!
-             #+SYMBOLICS &aux #+SYMBOLICS (!nsubgoals! '(0 nil)))
-  #+SYMBOLICS (declare (ignore !nsubgoals!))
+(defun =</2 (x y !level! !continuation!)
   (incf !level!)
   (and (dereference x)
        (dereference y)
@@ -2393,9 +2327,7 @@
       (funcall !continuation! !level!)))
 
 
-(defun op/3 (prec spec name &optional (!level! 0) !continuation!
-                            #+SYMBOLICS &aux #+SYMBOLICS (!nsubgoals! '(0 nil)))
-  #+SYMBOLICS (declare (ignore !nsubgoals!))
+(defun op/3 (prec spec name &optional (!level! 0) !continuation!)
   (incf !level!)
   (when (not (numberp prec)) (error "Non-numeric precedence ~A" prec))
   (case spec
@@ -2485,87 +2417,10 @@
   (get-internal-run-time))
 
 
-;; PROOF PRINTING FACILITY
-;; this works only on Symbolics machines because it examines the stack to find
-;; goals and subgoals if including variable names in variables is turned off
-;; for speed, variable names printed in proof may be ambiguous
-
-#+SYMBOLICS
-(scl:defflavor print-proof () (scl:condition))
-
-#+SYMBOLICS
-(scl:defmethod (dbg:report print-proof) (stream)
-  (declare (ignore stream)) nil)
-
-#+SYMBOLICS
-(defun print-proof (condition-object)
-  (dbg:with-erring-frame (frame-ptr condition-object)
-    (let (goals)
-      (do ((frame-ptr frame-ptr (dbg:frame-previous-interesting-active-frame frame-ptr)))
-	  ((null frame-ptr))
-	(let* ((l (dbg:get-frame-function-and-args frame-ptr))
-	       (n (and (symbolp (car l))
-		       (not (invisible-functor-p (car l)))
-		       (not (getf (get (car l) 'compiled-parameters) :split-procedure))
-		       (get (car l) 'arity))))
-	  (when n
-	    (let ((k (dbg:frame-local-value frame-ptr '!nsubgoals! t)))
-	      ;; Symbolics bug: above results in an error if there is no
-	      ;; !nsubgoals! variable in the stack frame
-	      (push (if k
-			(list n l (car k) (cadr k))
-			(list n l 0 nil))
-		    goals)))))
-      (format t "~2&Proof:~%Goal#  Wff#  Wff Instance~%-----  ----  ------------")
-      (print-proof1 goals 0 1 0)
-      nil)))
-
-#+SYMBOLICS
-(defun print-proof1 (goals goalnum ngoals level)
-  (dotimes (i ngoals)
-    (declare (ignore i))
-    (let ((arity (caar goals))
-          (goal (cadar goals))
-          (nsubgoals (caddar goals))
-          (number (cadddr (car goals))))
-      (format t "~&(~3D)" goalnum)
-      (cond ((consp number) (format t "~5D~A  " (car number) (cdr number)))
-	    (number (format t "~5D   " number))
-	    (t (princ "        ")))
-      (dotimes (i level) (declare (ignore i)) (princ "   "))
-      (write-functor-and-arguments (car goal) (subseq goal 1 (1+ arity)))
-      (cond ((= nsubgoals 0)
-             (princ ".")
-             (setq goalnum (1+ goalnum))
-             (setq goals (cdr goals)))
-	    (t (princ " <-")
-	       (let ((first t))
-		 (dolist (subgoal (collect-goals (cdr goals) nsubgoals))
-		   (cond (first (princ " ") (setq first nil))
-			 (t (princ " , ")))
-		   (write-functor-and-arguments
-                    (car subgoal) 
-                    (subseq subgoal 1 (1+ (get (car subgoal) 'arity))))))
-	       (princ ".")
-	       (multiple-value-setq (goals goalnum)
-                 (print-proof1 (cdr goals) (1+ goalnum) nsubgoals (1+ level)))))))
-  (values goals goalnum))
-
-#+SYMBOLICS
-(defun collect-goals (goals ngoals)
-  (let (w)
-    (dotimes (i ngoals)
-      (declare (ignore i))
-      (push (cadar goals) w)
-      (setq goals (skip-goals (cdr goals) (caddar goals))))
-    (nreverse w)))
-
-#+SYMBOLICS
-(defun skip-goals (goals ngoals)
-  (dotimes (i ngoals)
-    (declare (ignore i))
-    (setq goals (skip-goals (cdr goals) (caddar goals))))
-  goals)
+;;; Proof Printing Facility
+;;;
+;;; This was a Symbolics-only feature and will have to be re-implemented in a
+;;; portable manner.
 
 (defun numbered-letter (n)
   (case n
@@ -2573,7 +2428,8 @@
     ( 6 "f") ( 7 "g") ( 8 "h") ( 9 "i") (10 "j")
     (11 "k") (12 "l") (13 "m") (14 "n") (15 "o")
     (16 "p") (17 "q") (18 "r") (19 "s") (20 "t")
-    (21 "u") (22 "v") (23 "w") (24 "x") (25 "y") (26 "z")))
+    (21 "u") (22 "v") (23 "w") (24 "x") (25 "y")
+    (26 "z")))
 
 
 (defun chang&lee-examples nil

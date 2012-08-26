@@ -8,6 +8,9 @@
 
 (in-package #:pttpp)
 
+#+5am
+(5am:in-suite pttpp-runtime-suite)
+
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (setq *print-radix* nil))
 
@@ -23,6 +26,11 @@
 
 (defvar and-connective '|,/2|)
 (defvar or-connective  '\;/2)
+
+#+5am
+(5am:test test-connective-names
+  (5am:is (string-equal ",/2" (symbol-name and-connective)))
+  (5am:is (string-equal ";/2" (symbol-name or-connective))))
 
 ;; dynamic variables used during compilation
 
@@ -57,9 +65,11 @@
 ;;; print input clauses
 (defvar print-clauses t)			
 ;;; print names of functions as they are compiled
-(defvar print-compile-names t)			
-;;; print compilation time
-(defvar print-compile-times t)			
+(defvar print-compile-names t)
+;;; print compilation time 
+(defvar print-compile-times t)
+;;; Print execution time
+(defvar *print-execution-time* t)
 
 ;; when variable names are included in the variable, variables are represented
 ;; by
@@ -118,7 +128,7 @@
 
 (defvar *trail-array* (make-array 10000))
 
-(defvar *trail* 0)
+(defvar *trail* -1)
 
 (defmacro trail-variable-p (var)
   `(< (variable-level ,var) !level!))
@@ -1865,7 +1875,7 @@
     (apply #'program variables (list* `((<- (query) ,goal)) options)))
   (let (start-time stop-time value time)
     (setq *ncalls* 0)
-    (setq *trail* 0)
+    (setq *trail* -1)
     (setq *trace-search-time* 0)
     (setq *print-proof-time* 0)
     (setq start-time (get-internal-run-time))
@@ -1876,8 +1886,9 @@
       (setq time
             (/ (max 1 (- stop-time start-time *trace-search-time* *print-proof-time*))
                (float internal-time-units-per-second)))
-      (format t "~2&Execution time: ~:D inferences in ~,3F seconds (~,2F K lips)~%"
-              *ncalls* time (/ *ncalls* time 1000)))
+      (when *print-execution-time*
+        (format t "~2&Execution time: ~:D inferences in ~,3F seconds (~,2F K lips)~%"
+                *ncalls* time (/ *ncalls* time 1000))))
     value))
 
 

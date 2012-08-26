@@ -8,6 +8,9 @@
   :author "Matthias Hoelzl <tc@xantira.com>"
   :license "MIT, see file LICENSE"
   :depends-on (#:alexandria
+	       #:fiveam
                #:iterate)
   :components ((:file "package")
-               (:file "pttpp")))
+	       (:file "utilities")
+               (:file "pttpp")
+	       (:file "integration-tests")))

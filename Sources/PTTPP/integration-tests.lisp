@@ -1,27 +1,16 @@
 ;;; -*- Mode: Lisp; Syntax: Common-Lisp; Package: PTTPP; Base: 10; common-lisp-style: poem -*-
 
 ;;; Copyright (c) 1986 Mark E. Stickel, SRI International, Menlo Park, CA 94025 USA
-;;;
+;;; Copyright (c) 2012 Matthias Hölzl
+;;; 
 ;;; This file is licensed under the MIT license; see the file LICENSE
 ;;; in the root directory for further information.
 
 (in-package #:pttpp)
+(declaim (optimize (debug 3)))
 
-(defun chang&lee-examples ()
-  (print 'chang&lee-examples)
-  (chang&lee-example-1)
-  (chang&lee-example-2)
-  (chang&lee-example-3)
-  (chang&lee-example-4)
-  (chang&lee-example-5)
-  (chang&lee-example-6)
-  (chang&lee-example-7)
-  (chang&lee-example-8)
-  (chang&lee-example-9))
-
-(defun chang&lee-example-1 nil
-  (print 'chang&lee-example-1)
-  (format t "~&Prove that in an associative system with left and right solutions,~%there is a right identity element.")
+#+5am
+(define-integration-test chang&lee-test-1
   (program '(u v w x y z)
 	   '((p (g x y) x y)
 	     (p x (h x y) y)
@@ -29,11 +18,15 @@
 	     (-> (and (p x y u) (p y z v) (p u z w)) (p x v w))
 	     (<- (query) (and (search (p (k x) x (k x))) !)))
 	   :incomplete-inference t)
-  (query))
+  (query)
+  (5am:is (= 2 *trail*))
+  (5am:is (equal '(2 g/2 (3 2 2) (3 k/1 (1 h/2 (2 2) (4 2))))
+		 (aref *trail-array* 0)))
+  (5am:is (equal '(1 h/2 (2 2) (4 2))
+		 (aref *trail-array* 1))))
 
-(defun chang&lee-example-2 nil
-  (print 'chang&lee-example-2)
-  (format t "~&In an associative system with an identity element, if the square~%of every element is the identity, the system~%is commutative.")
+#+5am
+(define-integration-test chang&lee-test-2
   (program '(u v w x y z)
 	   '((p e x x)
 	     (p x e x)
@@ -43,11 +36,27 @@
 	     (-> (and (p x y u) (p y z v) (p u z w)) (p x v w))
 	     (<- (query) (and (search (p b a c)) !)))
 	   :incomplete-inference t)
-  (query))
+  (query)
+  (5am:is (= 8 *trail*))
+  (5am:is (equal '(3 2 . c)
+		 (aref *trail-array* 0)))
+  (5am:is (equal '(3 . e)
+		 (aref *trail-array* 1)))
+  (5am:is (equal '(5 . a)
+		 (aref *trail-array* 2)))
+  (5am:is (equal '(5 . b)
+		 (aref *trail-array* 3)))
+  (5am:is (equal '(2 . c)
+		 (aref *trail-array* 4)))
+  (5am:is (equal '(3 . b)
+		 (aref *trail-array* 5)))
+  (5am:is (equal '(5 . e)
+		 (aref *trail-array* 6)))
+  (5am:is (equal '(2 . a)
+		 (aref *trail-array* 7))))
 
-(defun chang&lee-example-3 nil
-  (print 'chang&lee-example-3)
-  (format t "~&In a group the left identity element is also a right identity.")
+#+5am
+(define-integration-test chang&lee-test-3
   (program '(u v w x y z)
 	   '((p e x x)
 	     (p (i x) x e)
@@ -55,11 +64,27 @@
 	     (-> (and (p x y u) (p y z v) (p u z w)) (p x v w))
 	     (<- (query) (and (search (p a e a)) !)))
 	   :incomplete-inference t)
-  (query))
+  (query)
+  (5am:is (= 8 *trail*))
+  (5am:is (equal '(2 i/1 (4 3 i/1 (5 3 . a)))
+		 (aref *trail-array* 0)))
+  (5am:is (equal '(3 . e)
+		 (aref *trail-array* 1)))
+  (5am:is (equal '(3 i/1 (5 3 . a))
+		 (aref *trail-array* 2)))
+  (5am:is (equal '(2 . e)
+		 (aref *trail-array* 3)))
+  (5am:is (equal '(3 . a)
+		 (aref *trail-array* 4)))
+  (5am:is (equal '(2 . e)
+		 (aref *trail-array* 5)))
+  (5am:is (equal '(8 i/1 (5 3 . a))
+		 (aref *trail-array* 6)))
+  (5am:is (equal '(8 . e)
+		 (aref *trail-array* 7))))
 
-(defun chang&lee-example-4 nil
-  (print 'chang&lee-example-4)
-  (format t "~&In a group with left inverse and left identity every element~%has a right inverse.")
+#+5am
+(define-integration-test chang&lee-test-4
   (program '(u v w x y z)
 	   '((p e x x)
 	     (p (i x) x e)
@@ -67,11 +92,23 @@
 	     (-> (and (p x y u) (p y z v) (p u z w)) (p x v w))
 	     (<- (query) (and (search (p a x e)) !)))
 	   :incomplete-inference t)
-  (query))
+  (query)
+  (5am:is (= 6 *trail*))
+  (5am:is (equal '(2 i/1 (4 3 i/1 (5 3 . a)))
+		 (aref *trail-array* 0)))
+  (5am:is (equal '(3 . e)
+		 (aref *trail-array* 1)))
+  (5am:is (equal '(3 i/1 (5 3 . a))
+		 (aref *trail-array* 2)))
+  (5am:is (equal '(2 . e)
+		 (aref *trail-array* 3)))
+  (5am:is (equal '(3 . a)
+		 (aref *trail-array* 4)))
+  (5am:is (equal '(2 1 i/1 (5 3 . a))
+		 (aref *trail-array* 5))))
 
-(defun chang&lee-example-5 nil
-  (print 'chang&lee-example-5)
-  (format t "~&If S is a nonempty subset of a group such that if x,y belong to S,~%then x*y^-1 belongs to S, then the identity e belongs to S.")
+#+5am
+(define-integration-test chang&lee-test-5
   (program '(u v w x y z)
 	   '((p e x x)
 	     (p x e x)
@@ -83,11 +120,13 @@
 	     (-> (and (p x y u) (p y z v) (p u z w)) (p x v w))
 	     (<- (query) (and (search (s e)) !)))
 	   :incomplete-inference t)
-  (query))
+  (query)
+  (5am:is (= 1 *trail*))
+  (5am:is (equal '(2 . a)
+		 (aref *trail-array* 0))))
 
-(defun chang&lee-example-6 nil
-  (print 'chang&lee-example-6)
-  (format t "~&If S is a nonempty subset of a group such that if x,y belong to S,~%then x*y^-1 belongs to S, then S contains x^-1 whenever it contains x.")
+#+5am
+(define-integration-test chang&lee-test-6
   (program '(u v w x y z)
 	   '((p e x x)
 	     (p x e x)
@@ -99,11 +138,17 @@
 	     (-> (and (p x y u) (p y z v) (p u z w)) (p x v w))
 	     (<- (query) (and (search (s (i a))) !)))
 	   :incomplete-inference t)
-  (query))
+  (query)
+  (5am:is (= 3 *trail*))
+  (5am:is (equal '(3 . a)
+		 (aref *trail-array* 0)))
+  (5am:is (equal '(3 . a)
+		 (aref *trail-array* 1)))
+  (5am:is (equal '(2 . e)
+		 (aref *trail-array* 2))))
 
-(defun chang&lee-example-7 nil
-  (print 'chang&lee-example-7)
-  (format t "~&If a is a prime and a = b^2/c^2 then a divides b.")
+#+5am
+(define-integration-test chang&lee-test-7
   (program '(u x y z)
 	   '((p a)
 	     (m a (s c) (s b))
@@ -112,11 +157,15 @@
 	     (or (~m x y z) (d x z))
 	     (or (~p x) (~m y z u) (~d x u) (d x y) (d x z))
 	     (<- (query) (and (search (d a b)) !))))
-  (query))
+  (query)
+  (5am:is (= 2 *trail*))
+  (5am:is (equal '(2 . b)
+		 (aref *trail-array* 0)))
+  (5am:is (equal '(2 s/1 b)
+		 (aref *trail-array* 1))))
 
-(defun chang&lee-example-8 nil
-  (print 'chang&lee-example-8)
-  (format t "~&Any number greater than 1 has a prime divisor.")
+#+5am
+(define-integration-test chang&lee-test-8
   (program '(x y z)
 	   '((l 1 a)
 	     (d x x)
@@ -128,11 +177,13 @@
 	     (or (~l 1 x) (~l x a) (p (f x)))
 	     (or (~l 1 x) (~l x a) (d (f x) x))
 	     (<- (query) (and (search (and (p x) (d x a))) !))))
-  (query))
+  (query)
+  (5am:is (= 1 *trail*))
+  (5am:is (equal '(1 . a)
+		 (aref *trail-array* 0))))
 
-(defun chang&lee-example-9 nil
-  (print 'chang&lee-example-9)
-  (format t "~&There exist infinitely many primes.")
+#+5am
+(define-integration-test chang&lee-test-9
   (program '(x y)
 	   '((l x (f x))
 	     (~l x x)
@@ -143,5 +194,7 @@
 	     (or (p x) (l (h x) x))
 	     (or (~p x) (~l a x) (l (f a) x))	; negation of theorem
 	     (<- (query) (and (search (and (p x) (l a x) (~l (f a) x))) !))))
-  (query))
-
+  (query)
+  (5am:is (= 1 *trail*))
+  (5am:is (equal '(1 f/1 (3 . a))
+		 (aref *trail-array* 0))))

@@ -1,7 +1,6 @@
 ;;; -*- Mode: Lisp; Syntax: Common-Lisp; Package: PTTPP; Base: 10; common-lisp-style: poem -*-
 
-;;; Copyright (c) 1986 Mark E. Stickel, SRI International, Menlo Park,
-;;; CA 94025 USA
+;;; Copyright (c) 1986 Mark E. Stickel, SRI International, Menlo Park, CA 94025 USA
 ;;;
 ;;; This file is licensed under the MIT license; see the file LICENSE
 ;;; in the root directory for further information.

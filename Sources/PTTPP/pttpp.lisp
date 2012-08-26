@@ -74,11 +74,17 @@
 
 
 (defstruct (logic-variable (:conc-name variable-)
+                           (:constructor)
                            (:constructor new-variable (name level))
                            (:predicate variable-p))
   (level 0 :type (and (integer 0) fixnum))
   value
   name)
+
+(defmethod make-load-form ((var logic-variable) &optional environment)
+  (make-load-form-saving-slots var
+                               :slot-names '(level value name)
+                               :environment environment))
 
 (defmacro dereference (x &key (if-constant t)
                               (if-variable nil)
@@ -1632,6 +1638,7 @@
             (list 
              'lambda
              (if (and split-procedure (not (= *arity* 0))) arglist auxlist)
+             '(declare (ignorable !old-trail!))
              `(incf !level!)
              (list 'block *name*
                    (wrap-call-fail-trace

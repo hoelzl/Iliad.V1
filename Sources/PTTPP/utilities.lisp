@@ -36,6 +36,7 @@
            (*print-compile-times* nil)
            (*print-execution-time* nil)
            (*print-clauses* nil)
+           (*traceable* nil)
            (*trace-search* nil)
            (*print-proof* nil)
            (*print-trail* nil)

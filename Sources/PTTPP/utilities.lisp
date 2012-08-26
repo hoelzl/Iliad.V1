@@ -25,6 +25,11 @@
   :description "Tests for the PTTPP compiler.")
 
 #+5am
+(5am:def-suite pttpp-builtins-suite
+  :in pttpp-suite
+  :description "Tests for the PTTPP built-in Prolog predicates.")
+
+#+5am
 (5am:def-suite pttpp-integration-suite
   :in pttpp-suite
   :description "Integration tests for the PTTPP compiler.")

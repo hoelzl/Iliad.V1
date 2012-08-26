@@ -12,4 +12,6 @@
                #:iterate)
   :components ((:file "package")
 	       (:file "utilities")
-               (:file "pttpp")))
+               (:file "pttpp-runtime")
+               (:file "pttpp-compiler")
+               (:file "pttpp-builtins")))

@@ -31,7 +31,7 @@
 
 #+5am
 (defmacro define-integration-test (name &body body)
-  `(5am:test (,name :suite pttpp-integration-suite)
+  `(5am:test (,name :suite pttpp-integration-suite :compile-at :definition-time)
      (let ((*print-compile-names* nil)
            (*print-compile-times* nil)
            (*print-execution-time* nil)

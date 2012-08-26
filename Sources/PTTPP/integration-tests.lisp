@@ -13,7 +13,6 @@
 (in-package #:pttpp)
 (declaim (optimize (debug 3)))
 
-
 #+5AM
 (define-integration-test simple-integration-test-01
   (program 'nil '((f a b) (<- (query) (f a b))) :traceable nil)

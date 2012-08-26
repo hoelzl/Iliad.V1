@@ -7,7 +7,8 @@
 ;;; in the root directory for further information.
 
 (in-package #:pttpp)
-(declaim (optimize (debug 3)))
+;; (declaim (optimize (debug 3)))
+;; (declaim (optimize (speed 2) (compilation-speed 0)))
 
 #+5am
 (5am:in-suite pttpp-runtime-suite)
@@ -70,7 +71,7 @@
                            (:constructor)
                            (:constructor new-variable (name level))
                            (:predicate variable-p))
-  (level 0 :type (and (integer 0) fixnum))
+  (level 0 :type fixnum)
   value
   name)
 

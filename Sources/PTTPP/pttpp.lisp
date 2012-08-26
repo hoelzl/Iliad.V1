@@ -86,29 +86,18 @@
 ;; for unbound variables this encoding assumes that integers will not be used
 ;; as functors
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (pushnew :include-name-in-variable *features*))
+(defstruct (logic-variable (:conc-name variable-)
+                           (:constructor)
+                           (:constructor new-variable (name level))
+                           (:predicate variable-p))
+  (level 0 :type (and (integer 0) fixnum))
+  value
+  name)
 
-(defun new-variable (var-name var-level)
-  #-include-name-in-variable (declare (ignore var-name))
-  (list* var-level nil #+include-name-in-variable var-name))
-
-(defmacro variable-p (x)
-  ;; x nonatomic
-  `(integerp (car ,x)))
-
-(defmacro variable-level (x)
-  `(car ,x))
-
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (defmacro variable-value (x)
-    #+include-name-in-variable `(cadr ,x)
-    #-include-name-in-variable `(cdr ,x)))
-
-(defmacro variable-name (x)
-  #-include-name-in-variable (declare (ignore x))
-  #+include-name-in-variable `(cddr ,x)
-  #-include-name-in-variable `'_)
+(defmethod make-load-form ((var logic-variable) &optional environment)
+  (make-load-form-saving-slots var
+                               :slot-names '(level value name)
+                               :environment environment))
 
 (defmacro dereference (x &key (if-constant t)
                               (if-variable nil)
@@ -1660,7 +1649,7 @@
       (setq defn
             (list 
              'lambda
-             (if (and split-procedure (not (= arity 0))) arglist auxlist)
+             (if (and split-procedure (not (= *arity* 0))) arglist auxlist)
              '(declare (ignorable !old-trail!))
              `(incf !level!)
              (list 'block name

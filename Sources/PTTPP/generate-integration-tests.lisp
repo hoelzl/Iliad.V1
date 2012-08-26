@@ -40,14 +40,14 @@
                                (push `(5am:is (= ',(variable-level obj)
                                                  (variable-level ,name)))
                                      tests)
-                               (push `(5am:is (equal ',(variable-name obj)
+                               (push `(5am:is (eql ',(variable-name obj)
                                                      (variable-name ,name)))
                                      tests)
-                               (if (atom value)
-                                   (push `(5am:is (equal ',value
-                                                         (variable-value ,name)))
-                                         tests)
-                                   (walk value `(variable-value ,name)))))
+                               (when (atom value)
+                                 (push `(5am:is (equalp ',value
+                                                        (variable-value ,name)))
+                                       tests))
+                               (walk value `(variable-value ,name))))
                             ((consp obj)
                              (let ((name (name "PRED")))
                                (push `(,name ,form) bindings)
@@ -56,13 +56,14 @@
                                      (push `(5am:is (eql ',(nth i obj)
                                                          (first ,name))) tests)
                                      (let ((value (nth i obj)))
-                                       (if (atom value)
-                                           (push `(5am:is (equal ',value
-                                                                 (nth ,i ,name)))
-                                                 tests)
-                                           (walk value `(nth ,i ,name))))))))
+                                       (when (atom value)
+                                         (push `(5am:is (equalp ',value
+                                                                (nth ,i ,name)))
+                                               tests))
+                                       (walk value `(nth ,i ,name)))))))
                             (t
-                             (warn "Don't know how to handle ~A, ~A." obj form)))))
+                             ;; Do nothing
+                             nil))))
              (dotimes (i (1+ *trail*))
                (walk (aref *trail-array* i) `(aref *trail-array* ,i)))
              `(define-integration-test ,',name

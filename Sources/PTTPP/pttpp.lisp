@@ -71,44 +71,13 @@
 ;;; Print execution time
 (defvar *print-execution-time* t)
 
-;; when variable names are included in the variable, variables are represented
-;; by
-;;   (variable-level pointer-to-value . variable-name)
-;; for bound variables and
-;;   (variable-level       nil        . variable-name)
-;; for unbound variables
-;; 
-;; when variable names are not included in the variable, variables are
-;; represented by
-;;   (variable-level . pointer-to-value) 
-;; for bound variables and
-;;   (variable-level .       nil       )
-;; for unbound variables this encoding assumes that integers will not be used
-;; as functors
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (pushnew :include-name-in-variable *features*))
-
-(defun new-variable (var-name var-level)
-  #-include-name-in-variable (declare (ignore var-name))
-  (list* var-level nil #+include-name-in-variable var-name))
-
-(defmacro variable-p (x)
-  ;; x nonatomic
-  `(integerp (car ,x)))
-
-(defmacro variable-level (x)
-  `(car ,x))
-
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (defmacro variable-value (x)
-    #+include-name-in-variable `(cadr ,x)
-    #-include-name-in-variable `(cdr ,x)))
-
-(defmacro variable-name (x)
-  #-include-name-in-variable (declare (ignore x))
-  #+include-name-in-variable `(cddr ,x)
-  #-include-name-in-variable `'_)
+(defstruct (logic-variable (:conc-name variable-)
+                           (:constructor new-variable (name level))
+                           (:predicate variable-p))
+  (level 0 :type (and (integer 0) fixnum))
+  value
+  name)
 
 (defmacro dereference (x &key (if-constant t)
                               (if-variable nil)
@@ -118,12 +87,12 @@
   (assert (symbolp x))
   (let ((y (gensym)))
     `(do nil (nil)
-       (cond ((atom ,x)
-	      (return ,if-constant))
-	     ((variable-p ,x)
+       (cond ((variable-p ,x)
 	      (unless (let ((,y (variable-value ,x)))
 			(when ,y (setq ,x ,y)))
 		(return ,if-variable)))
+             ((atom ,x)
+	      (return ,if-constant))
 	     (t (return ,if-compound))))))
 
 (defvar *trail-array* (make-array 10000))
@@ -504,12 +473,12 @@
 
 (defun write-term (term)
   (dereference term)
-  (cond ((atom term)
-         (princ (if (symbolp term) (constant-case term) term)))
-	((variable-p term)
+  (cond	((variable-p term)
          (princ (variable-case (variable-name term)))
          (princ "_")
          (princ (variable-level term)))
+        ((atom term)
+         (princ (if (symbolp term) (constant-case term) term)))
 	(t (write-functor-and-arguments (car term) (cdr term))))
   term)
 

@@ -15,13 +15,6 @@
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (setq *print-radix* nil))
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (defmacro stack-let (bindings &body body)
-    ;; stack-let on the 3600 is like let except variable values are
-    ;; consed on the stack, not in the heap thereby diminishing
-    ;; allocation/deallocation costs
-    `(let ,bindings . ,body)))
-
 (defconstant +float-internal-time-units-per-second+
   (float internal-time-units-per-second))
 
@@ -162,7 +155,7 @@
                                 x))
                         formals actuals)))
      (if decls
-         `(stack-let ,decls
+         `(let ,decls
             (,(car term) ,@args ,level ,continuation))
          `(,(car term) ,@args ,level ,continuation)))))
 
@@ -648,12 +641,12 @@
 
 (defun begin-search
     (maximum-depth minimum-depth default-depth-increment !level! !continuation!)
-  (stack-let ((*old-remaining-depths*
-               (cons *remaining-depth* *old-remaining-depths*))
-	      (*old-prev-depth-increments*
-               (cons *prev-depth-increment* *old-prev-depth-increments*))
-	      (*old-minus-next-depth-increments*
-               (cons *minus-next-depth-increment* *old-minus-next-depth-increments*)))
+  (let ((*old-remaining-depths*
+          (cons *remaining-depth* *old-remaining-depths*))
+        (*old-prev-depth-increments*
+          (cons *prev-depth-increment* *old-prev-depth-increments*))
+        (*old-minus-next-depth-increments*
+          (cons *minus-next-depth-increment* *old-minus-next-depth-increments*)))
     (let (*remaining-depth*
           *prev-depth-increment*
           *minus-next-depth-increment*
@@ -755,10 +748,10 @@
 	(if (= *arity* 0)
 	    `(let ((,nname t))
 	       ,form)
-	    `(stack-let ((,nname (cons ,(cond ((= *arity* 0) t)
-					      ((= *arity* 1) '!arg1!)
-					      (t '!args!))
-				       ,nname)))
+	    `(let ((,nname (cons ,(cond ((= *arity* 0) t)
+                                        ((= *arity* 1) '!arg1!)
+                                        (t '!args!))
+                                 ,nname)))
                ,form)))
       form))
 
@@ -1107,7 +1100,7 @@
 (defun wrap-bind-args (form)
   (if (and (or (not *allow-repeated-goals*) (not *incomplete-inference*))
            (> *arity* 1))
-      `(stack-let ((!args! (list . ,(head-locs *arity*))))
+      `(let ((!args! (list . ,(head-locs *arity*))))
 	 ,form)
       form))
 
@@ -1120,7 +1113,7 @@
 
 (defun stack-list-new-variables (variables form)
   (cond ((null variables) form)
-	(t (list 'stack-let
+	(t (list 'let
 		 (mapcar
                   #'(lambda (v)
                       (list v `(new-variable ',v !level!) ))
@@ -1306,8 +1299,7 @@
 	       (remove-if-not #'(lambda (v)
                                   (variable-occurs-in-term-p v (car headpats)))
                               unbound)
-	       `(stack-let
-                    ((!compound! ,(term-constructor (car headpats) vars)))
+	       `(let ((!compound! ,(term-constructor (car headpats) vars)))
 		  (when (unify-argument-with-compound
 			  ,(car headlocs) !compound! :trail-is-nil
                           ,trail-is-nil :unsafe ,*unsafe-unification*)
@@ -1573,7 +1565,7 @@
                                             (variable-occurs-in-term-p
                                              v (first (clause-args clause))))
                                         variables)
-			 `(stack-let
+			 `(let
                               ((!compound! ,(term-constructor
                                              (first (clause-args clause))
                                              variables)))
@@ -2117,38 +2109,38 @@
 		  (funcall !continuation! !level!)
 		  (undo-bindings)))
         ;; (new-variable '_)
-	(1 (stack-let ((struct (list functor
-                                     (new-variable 'z1 !level!))))	
+	(1 (let ((struct (list functor
+                               (new-variable 'z1 !level!))))	
 	     (progn (bind-variable-to-term term struct :trail)
 		    (funcall !continuation! !level!)
 		    (undo-bindings))))
-	(2 (stack-let ((struct (list functor
-                                     (new-variable 'z1 !level!)
-                                     (new-variable 'z2 !level!))))
+	(2 (let ((struct (list functor
+                               (new-variable 'z1 !level!)
+                               (new-variable 'z2 !level!))))
 	     (progn (bind-variable-to-term term struct :trail)
 		    (funcall !continuation! !level!)
 		    (undo-bindings))))
-	(3 (stack-let ((struct (list functor
-                                     (new-variable 'z1 !level!)
-                                     (new-variable 'z2 !level!)
-                                     (new-variable 'z3 !level!))))
+	(3 (let ((struct (list functor
+                               (new-variable 'z1 !level!)
+                               (new-variable 'z2 !level!)
+                               (new-variable 'z3 !level!))))
 	     (progn (bind-variable-to-term term struct :trail)
 		    (funcall !continuation! !level!)
 		    (undo-bindings))))
-	(4 (stack-let ((struct (list functor
-                                     (new-variable 'z1 !level!)
-                                     (new-variable 'z2 !level!)
-                                     (new-variable 'z3 !level!)
-                                     (new-variable 'z4 !level!))))
+	(4 (let ((struct (list functor
+                               (new-variable 'z1 !level!)
+                               (new-variable 'z2 !level!)
+                               (new-variable 'z3 !level!)
+                               (new-variable 'z4 !level!))))
 	     (progn (bind-variable-to-term term struct :trail)
 		    (funcall !continuation! !level!)
 		    (undo-bindings))))
-	(5 (stack-let ((struct (list functor
-                                     (new-variable 'z1 !level!)
-                                     (new-variable 'z2 !level!)
-                                     (new-variable 'z3 !level!)
-                                     (new-variable 'z4 !level!)
-                                     (new-variable 'z5 !level!))))
+	(5 (let ((struct (list functor
+                               (new-variable 'z1 !level!)
+                               (new-variable 'z2 !level!)
+                               (new-variable 'z3 !level!)
+                               (new-variable 'z4 !level!)
+                               (new-variable 'z5 !level!))))
 	     (progn (bind-variable-to-term term struct :trail)
 		    (funcall !continuation! !level!)
 		    (undo-bindings))))

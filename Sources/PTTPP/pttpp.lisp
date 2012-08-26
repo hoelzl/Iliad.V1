@@ -1661,6 +1661,7 @@
             (list 
              'lambda
              (if (and split-procedure (not (= arity 0))) arglist auxlist)
+             '(declare (ignorable !old-trail!))
              `(incf !level!)
              (list 'block name
                    (wrap-call-fail-trace

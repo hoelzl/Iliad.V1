@@ -604,11 +604,15 @@
               (write-functor-and-arguments* ',nm . ,args)))))
 
 (defun wrap-call-fail-trace (form)
-  (if *traceable* `(trace-call-fail ,*name* ,form) form))
+  (if *traceable*
+      `(trace-call-fail ,*name* ,form)
+      form))
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defun wrap-exit-redo-trace (form)
-    (if *traceable* `(trace-exit-redo ,*name* ,form) form)))
+    (if *traceable*
+        `(trace-exit-redo ,*name* ,form)
+        form)))
 
 
 ;; CONSECUTIVELY BOUNDED DEPTH-FIRST SEARCH

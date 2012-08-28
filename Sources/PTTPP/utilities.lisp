@@ -7,6 +7,14 @@
 
 (in-package #:pttpp)
 
+;;; General utilities
+;;; =================
+
+(defmacro defglobal (name value &optional doc)
+  `(#+sbcl sb-ext:defglobal
+    #-sbcl defvar
+    ,name ,value ,@(if doc (list doc) ())))
+
 ;;; Testing
 ;;; =======
 

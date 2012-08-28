@@ -73,7 +73,7 @@
 
 (defun term-constructors (terms vars)
   (let ((newterms nil))
-    (setq newterms (mapcar #'(lambda (term)
+    (setf newterms (mapcar #'(lambda (term)
                                (term-constructor term vars))
                            terms))
     (cond ((every #'(lambda (x)
@@ -110,9 +110,13 @@
                   variables)
 		 form))))
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (defmacro invisible-functor-p (x)
-    `(get ,x 'invisible-functor)))
+#+5am
+(5am:test test-stack-list-new-variables
+  (5am:is (equal '(foo bar)
+                 (stack-list-new-variables '() '(foo bar))))
+  (5am:is (equal '(let ((a (new-variable 'a !level!)))
+                   (foo bar))
+                 (stack-list-new-variables '(a) '(foo bar)))))
 
 (defun clause-body-length (body &optional fl)
   (cond ((atom body) 0)
@@ -150,7 +154,7 @@
       continuation
       `(progn
          ,continuation
-         (when (= *trail* !old-trail!)
+         (when (= (rt-trail-index *runtime-data*) !old-trail!)
            (return-from ,*name* nil)))))
 
 (defun compile-body-search (body vars unbound continuation)
@@ -233,7 +237,7 @@
 (defun compile-clause-body (body vars unbound)
   (if (equal body '(true/0))
       ;;  automatically cut if unit clause subsumes goal
-      (setq body '?!))
+      (setf body '?!))
   (let* ((length (clause-body-length body))
 	 (nonunit (> length 0))
 	 (*incomplete-inference* (or *incomplete-inference* (not nonunit)))
@@ -374,8 +378,8 @@
                    (return-from ,*name* nil))))
 	   (nreverse compiled-clauses))))
     (declare (special *clausenum*))
-    (setq clause (car clauses))
-    (setq *clausenum* (cdr (assoc clause *clause-numbers*)))
+    (setf clause (car clauses))
+    (setf *clausenum* (cdr (assoc clause *clause-numbers*)))
     (unless (not (atom (first (clause-args clause))))
       (push (cond ((eq (first (clause-args clause)) '_)
 		   (wrap-depth-test
@@ -399,8 +403,8 @@
 			(all-constant-arguments clause variables)
 			(equal (clause-body clause) (clause-body (cadr clauses)))
 			(all-constant-arguments (cadr clauses) variables))
-		   (setq *clausenum* nil)
-		   (setq clauses (cdr clauses))
+		   (setf *clausenum* nil)
+		   (setf clauses (cdr clauses))
 		   (do ((values (list (if (= *arity* 1)
                                           (first (clause-args (car clauses)))
                                           (clause-args (car clauses)))
@@ -427,7 +431,7 @@
                                      (cdr (head-locs (clause-args clause)))
                                      (clause-body clause) variables unbound))
 				(clause-body clause)))))
-		     (setq clauses (cdr clauses))))
+		     (setf clauses (cdr clauses))))
 		  (t `(when (eql !arg1! ',(first (clause-args clause)))
 			,(wrap-depth-test
 			   (compile-clause
@@ -457,8 +461,8 @@
                    (return-from ,*name* nil))))
 	   (nreverse compiled-clauses))))
     (declare (special *clausenum*))
-    (setq clause (car clauses))
-    (setq *clausenum* (cdr (assoc clause *clause-numbers*)))
+    (setf clause (car clauses))
+    (setf *clausenum* (cdr (assoc clause *clause-numbers*)))
     (unless (and (atom (first (clause-args clause)))
 		 (not (eq (first (clause-args clause)) '_))
 		 (not (member (first (clause-args clause)) variables)))
@@ -514,8 +518,8 @@
                    (return-from ,*name* nil))))
 	   (nreverse compiled-clauses))))
     (declare (special *clausenum*))
-    (setq clause (car clauses))
-    (setq *clausenum* (cdr (assoc clause *clause-numbers*)))
+    (setf clause (car clauses))
+    (setf *clausenum* (cdr (assoc clause *clause-numbers*)))
     (push (cond ((eq (first (clause-args clause)) '_)
 		 (wrap-depth-test
 		   (compile-clause
@@ -538,8 +542,8 @@
 		      (all-constant-arguments clause variables)
 		      (equal (clause-body clause) (clause-body (cadr clauses)))
 		      (all-constant-arguments (cadr clauses) variables))
-		 (setq *clausenum* nil)
-		 (setq clauses (cdr clauses))
+		 (setf *clausenum* nil)
+		 (setf clauses (cdr clauses))
 		 (do ((*first-argument-type* :variable-bound-to-constant-first-argument)
 		      (values (list (if (= *arity* 1)
                                         (first (clause-args (car clauses)))
@@ -571,7 +575,7 @@
                                     (clause-body clause) variables unbound)
                                   (undo-bindings)))
                            (clause-body clause))))
-		   (setq clauses (cdr clauses))))
+		   (setf clauses (cdr clauses))))
 		((atom (first (clause-args clause)))
 		 (let ((*first-argument-type* :variable-bound-to-constant-first-argument))
 		   (wrap-depth-test
@@ -624,13 +628,13 @@
         (unbound variables)
         (lisp-compile-time 0))
     (when (eq *name* 'query/0)
-      (setq *traceable* nil)
-      (setq *unbounded-search* t)
-      (setq *incomplete-inference* t)
-      (setq *allow-repeated-goals* t))
-    (if (= *arity* 0) (setq split-procedure nil))
-    (if (not *trace-calls*) (setq *traceable* nil))
-    (setq parameters
+      (setf *traceable* nil)
+      (setf *unbounded-search* t)
+      (setf *incomplete-inference* t)
+      (setf *allow-repeated-goals* t))
+    (if (= *arity* 0) (setf split-procedure nil))
+    (if (not *trace-calls*) (setf *traceable* nil))
+    (setf parameters
           (list :count-calls *count-calls*
                 :clause-numbers
                 (mapcar #'(lambda (clause)
@@ -648,17 +652,17 @@
               (not (equal parameters (get *name* 'compiled-parameters))))
       (let (arglist auxlist namec names namev defn defnc defns defnv)
         (when (not *allow-repeated-goals*)
-          (dolist (clause clauses (setq *allow-repeated-goals* t))
+          (dolist (clause clauses (setf *allow-repeated-goals* t))
             (when (> (clause-body-length (clause-body clause)) 0)
               (return))))
-        (setq arglist
+        (setf arglist
               (append (head-locs *arity*) '(!level! !continuation!)))
-        (setq auxlist
-              (append arglist '(&aux (!old-trail! *trail*))))
+        (setf auxlist
+              (append arglist '(&aux (!old-trail! (rt-trail-index *runtime-data*)))))
         (when (or (not *allow-repeated-goals*) (not *incomplete-inference*))
           (eval `(defvar ,(ancestors-name *name*) nil))
           (eval `(defvar ,(ancestors-name (negated-functor *name*)) nil)))
-        (setq defn
+        (setf defn
               (list 
                'lambda
                (if (and split-procedure (not (= *arity* 0))) arglist auxlist)
@@ -687,8 +691,8 @@
                                             (return-from ,*name* nil))))
                                     (nreverse compiled-clauses))))
                                (declare (special *clausenum*))
-                               (setq clause (car clauses))
-                               (setq *clausenum*
+                               (setf clause (car clauses))
+                               (setf *clausenum*
                                      (cdr (assoc clause *clause-numbers*)))
                                (push (wrap-depth-test
                                       (compile-clause
@@ -697,15 +701,15 @@
                                       (clause-body clause))
                                      compiled-clauses)))
                             (split-procedure
-                             (setq namec
+                             (setf namec
                                    (intern 
                                     (concatenate 'string (symbol-name *name*) "C")
                                     'pttpp))
-                             (setq names
+                             (setf names
                                    (intern
                                     (concatenate 'string (symbol-name *name*) "S")
                                     'pttpp))
-                             (setq namev
+                             (setf namev
                                    (intern
                                     (concatenate 'string (symbol-name *name*) "V")
                                     'pttpp))
@@ -716,7 +720,7 @@
                                (setf (get namec 'arity) *arity*)
                                (setf (get names 'arity) *arity*)
                                (setf (get namev 'arity) *arity*))
-                             (setq defnc
+                             (setf defnc
                                    (list
                                     'lambda
                                     auxlist
@@ -724,7 +728,7 @@
                                           (wrap-bind-args
                                            (compile-procedure-for-constant-first-argument
                                             clauses variables)))))
-                             (setq defns
+                             (setf defns
                                    (list
                                     'lambda
                                     auxlist
@@ -732,7 +736,7 @@
                                           (wrap-bind-args
                                            (compile-procedure-for-compound-first-argument
                                             clauses variables)))))
-                             (setq defnv
+                             (setf defnv
                                    (list
                                     'lambda
                                     auxlist
@@ -759,7 +763,7 @@
                                      clauses variables)))))))))
         (when *print-compile-names*
           (format t "~&~A compiled from PTTPP to LISP" *name*))
-        (setq lisp-compile-time (get-internal-run-time))
+        (setf lisp-compile-time (get-internal-run-time))
         (when (and split-procedure (> *arity* 0))
           (compile namec defnc)
           (compile names defns)
@@ -767,7 +771,7 @@
         (compile *name* defn)
         (when *print-compile-names*
           (format t "~&~A compiled from LISP to machine code" *name*))
-        (setq lisp-compile-time (- (get-internal-run-time) lisp-compile-time)))
+        (setf lisp-compile-time (- (get-internal-run-time) lisp-compile-time)))
       (setf (get *name* 'compiled-clauses) clauses)
       (setf (get *name* 'compiled-parameters) parameters))
     lisp-compile-time))
@@ -795,21 +799,21 @@
 
 (defun program (variables wffs &rest options)
   (let (clauses predicates wff-number start-time stop-time (lisp-compile-time 0))
-    (setq start-time (get-internal-run-time))
-    (setq wffs (canonicalize-functors-in-terms wffs))
-    (setq stop-time (get-internal-run-time))
+    (setf start-time (get-internal-run-time))
+    (setf wffs (canonicalize-functors-in-terms wffs))
+    (setf stop-time (get-internal-run-time))
     
     (when *print-clauses*
-      (setq wff-number 0)
-      (setq *clause-numbers* nil)
+      (setf wff-number 0)
+      (setf *clause-numbers* nil)
       (dolist (wff wffs)
 	(incf wff-number)
 	(push (cons wff wff-number) *clause-numbers*))
       (*print-clauses* wffs variables))
     
-    (setq start-time (- (get-internal-run-time) (- stop-time start-time)))
-    (setq wff-number 0)
-    (setq *clause-numbers* nil)
+    (setf start-time (- (get-internal-run-time) (- stop-time start-time)))
+    (setf wff-number 0)
+    (setf *clause-numbers* nil)
     (dolist (wff wffs)
       (incf wff-number)
       (let ((cls (clauses-from-wff wff)))
@@ -830,15 +834,15 @@
                               predicates)
 		     (pushnew (negated-functor (clause-pred (car clauses)))
                               predicates)))))))
-    (setq clauses (nreverse clauses))
-    (setq predicates (nreverse predicates))
+    (setf clauses (nreverse clauses))
+    (setf predicates (nreverse predicates))
     
     (dolist (pred predicates)
       (incf lisp-compile-time
             (apply #'compile-procedure
                    (list* pred variables (predicate-clauses pred clauses)
                           options))))
-    (setq stop-time (get-internal-run-time))
+    (setf stop-time (get-internal-run-time))
     
     (when *print-compile-times*
       (format t "~2&Compilation time: ~,3F seconds (PTTPP) + ~,3F seconds (LISP)~%"
@@ -864,9 +868,9 @@
     (when *print-success-notification*
       (if *print-trail*
 	  (format t "~&Success:  trail = ~A,~%~4Ttrail-array = ~W.~%"
-		  *trail*
-                  (make-array `(,(1+ *trail*))
-                              :displaced-to *trail-array*))
+		  (rt-trail-index *runtime-data*)
+                  (make-array `(,(1+ (rt-trail-index *runtime-data*)))
+                              :displaced-to (rt-trail-array *runtime-data*)))
 	  (format t "~&Success."))))
     (incf *number-of-solutions-found*)
   (if *single-solution*
@@ -877,16 +881,16 @@
   (when goal
     (apply #'program variables (list* `((<- (query) ,goal)) options)))
   (let (start-time stop-time value time)
-    (setq *ncalls* 0)
-    (setq *trail* -1)
-    (setq *trace-search-time* 0)
-    (setq *print-proof-time* 0)
-    (setq start-time (get-internal-run-time))
-    (setq value (catch 'query 
+    (setf *ncalls* 0)
+    (setf (rt-trail-index *runtime-data*) -1)
+    (setf *trace-search-time* 0)
+    (setf *print-proof-time* 0)
+    (setf start-time (get-internal-run-time))
+    (setf value (catch 'query 
 		  (query/0 0 #'query-success)))
-    (setq stop-time (get-internal-run-time))
+    (setf stop-time (get-internal-run-time))
     (when (> *ncalls* 0)
-      (setq time
+      (setf time
             (/ (max 1 (- stop-time start-time *trace-search-time* *print-proof-time*))
                (float internal-time-units-per-second)))
       (when *print-execution-time*
@@ -927,7 +931,7 @@
 	(if (digit-char-p (char s (1- n)))
 	    (do ((n (- n 2) (1- n)) (ch))
 		((= n 0) x)
-	      (setq ch (char s n))
+	      (setf ch (char s n))
 	      (cond ((digit-char-p ch))
 		    ((char= ch '#\/) (return (setf (get x 'name) (subseq s 0 n))))
 		    (t (return (setf (get x 'name) x)))))
@@ -941,8 +945,8 @@
 	(if arity
 	    (do ((n (- n 2) (1- n)) (tens 10 (* 10 tens)) (ch) (num))
 		((= n 0) '?)
-	      (setq ch (char s n))
-	      (setq num (digit-char-p ch))
+	      (setf ch (char s n))
+	      (setf num (digit-char-p ch))
 	      (cond (num (incf arity (* tens num)))
 		    ((char= ch '#\/) (setf (get x 'arity) arity) (return arity))
 		    (t (return '?))))
@@ -992,7 +996,7 @@
 (defun convert-string-to-list (s)
   (do ((i (1- (length s)) (1- i)) (w '|[]|))
       ((< i 0) w)
-    (setq w `(cons/2 ,(char-code (char s i)) ,w))))
+    (setf w `(cons/2 ,(char-code (char s i)) ,w))))
 
 (defun canonicalize-functors-in-term (term)
   (cond ((atom term)
@@ -1047,7 +1051,7 @@
            (conjoin (clause-body-for-literal lit (cadr wff))
                     (clause-body-for-literal lit (caddr wff))))
           ((equal lit wff) '(true/0))
-          ((and (eq (car lit) (setq ~f (negated-functor (car wff))))
+          ((and (eq (car lit) (setf ~f (negated-functor (car wff))))
                 (equal (cdr lit) (cdr wff)))
            '(false/0))
           (t (cons ~f (cdr wff))))))

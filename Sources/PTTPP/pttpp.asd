@@ -3,7 +3,7 @@
 (asdf:defsystem #:pttpp
   :serial t
   :description "The Prolog Technology Theorem Prover for Poem"
-  :version "0.0.2"
+  :version "0.0.3"
   :author "Mark E. Stickel, SRI International (original author)"
   :author "Matthias Hoelzl <tc@xantira.com>"
   :license "MIT, see file LICENSE"
@@ -11,7 +11,8 @@
 	       #:fiveam
                #:iterate)
   :components ((:file "package")
+	       (:file "bootstrap")
 	       (:file "utilities")
-               (:file "pttpp-runtime")
-               (:file "pttpp-compiler")
-               (:file "pttpp-builtins")))
+               (:file "runtime")
+               (:file "compiler")
+               (:file "builtins")))

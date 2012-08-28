@@ -16,52 +16,45 @@
 #+5am
 (5am:in-suite pttpp-runtime-suite)
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (setq *print-radix* nil))
-
 (defconstant +float-internal-time-units-per-second+
   (float internal-time-units-per-second))
 
-(defconstant +and-connective+ '|,/2|)
-(defconstant +or-connective+  '\;/2)
+(defconstant +and-connective+ '|,/2|
+  "The canonical operator for and.")
+(defconstant +or-connective+  '\;/2
+  "The canonical operator for or.")
 
 #+5am
 (5am:test test-connective-names
   (5am:is (string-equal ",/2" (symbol-name +and-connective+)))
   (5am:is (string-equal ";/2" (symbol-name +or-connective+))))
 
+
 ;; dynamic variables used during compilation
 
-;;; name of procedure being compiled
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (defvar *name* nil))				
 ;;; arity of procedure being compiled
-(defvar *arity*)					
+(defvar *arity*)
 ;:; association list of clauses and their numbers
-(defvar *clause-numbers*)				
+(defvar *clause-numbers*)
 ;;: the type of the first argument to the procedure
-(defvar *first-argument-type*)			
-;;; compile-procedure option to compile code for tracing
-(defvar *traceable*)				
+(defvar *first-argument-type*)
 ;;; compile-procedure option to not compile code for depth-bounded
 ;;; search
-(defvar *unbounded-search*)			
+(defvar *unbounded-search*)
 ;;; compile-procedure option to not use the occurs check during
 ;;; unification
-(defvar *unsafe-unification*)			
+(defvar *unsafe-unification*)
 ;;; compile-procedure option to compile ME reduction operations
-(defvar *incomplete-inference*)			
+(defvar *incomplete-inference*)
 ;;; compile-procedure option to compile ME pruning operations
-(defvar *allow-repeated-goals*)			
+(defvar *allow-repeated-goals*)
 ;;; if nil, tracing will not be compiled regardless of :traceable
 ;;; option
-(defvar *trace-calls* t)				
-;;; compile code to count successful unifications?
-(defvar *count-calls* t)				
+(defvar *trace-calls* t)
 ;;; recompile procedure even if clauses and parameters are the same
-(defvar *recompile* nil)				
+(defvar *recompile* nil)
 ;;; print input clauses
-(defvar *print-clauses* t)			
+(defvar *print-clauses* t)
 ;;; print names of functions as they are compiled
 (defvar *print-compile-names* t)
 ;;; print compilation time 
@@ -74,6 +67,7 @@
                            (:constructor)
                            (:constructor new-variable (name level))
                            (:predicate variable-p))
+  "Runtime representation of logic variables."
   (level 0 :type fixnum)
   value
   name)
@@ -86,22 +80,25 @@
 (defmacro dereference (x &key (if-constant t)
                               (if-variable nil)
                               (if-compound nil))
-  ;; dereferences x leaving result in x, returns t if result is
-  ;; atomic, nil if not
-  (assert (symbolp x))
-  (let ((y (gensym)))
-    `(do nil (nil)
+  "Dereferences the place X.  If X references a bound variable, recursively
+stores the binding in X until it is no longer a variable or an unbound
+variable.  Returns IF-CONSTANT, if (after this update) X is a constant value;
+IF-VARIABLE if X is an unbound variable, and IF-COMPOUND if X is a compound
+term."
+  (with-gensyms ((variable-value #:variable-value-))
+    `(iter 
        (cond ((variable-p ,x)
-	      (unless (let ((,y (variable-value ,x)))
-			(when ,y (setq ,x ,y)))
-		(return ,if-variable)))
+              (let ((,variable-value (variable-value ,x)))
+                (if ,variable-value
+                    (setf ,x ,variable-value)
+                    (leave ,if-variable))))
              ((atom ,x)
-	      (return ,if-constant))
-	     (t (return ,if-compound))))))
+              (leave ,if-constant))
+             (t (leave ,if-compound))))))
 
-(defvar *trail-array* (make-array 10000))
-
-(defvar *trail* -1)
+(declaim (type runtime-data *runtime-data*))
+(defglobal *runtime-data* (make-runtime-data)
+    "The data needed by the pttpp runtime.")
 
 (defmacro trail-variable-p (var)
   `(< (variable-level ,var) !level!))
@@ -114,23 +111,27 @@
 	 `(progn (setf (variable-value ,var) ,term)
 		 t))
 	((eq trail? :trail)
-	 `(progn (setf (svref *trail-array* (incf *trail*)) ,var)
+	 `(progn (setf (svref (rt-trail-array *runtime-data*)
+                              (incf (rt-trail-index *runtime-data*)))
+                       ,var)
 		 (setf (variable-value ,var) ,term)
 		 t))
 	(t `(progn (if (trail-variable-p ,var)
-		       (setf (svref *trail-array* (incf *trail*)) ,var))
+		       (setf (svref (rt-trail-array *runtime-data*)
+                                    (incf (rt-trail-index *runtime-data*)))
+                             ,var))
 		   (setf (variable-value ,var) ,term)
 		   t))))
 
-(defmacro undo-bindings nil
+(defmacro undo-bindings ()
   ;; MUST RETURN NIL
-  `(let ((trail *trail*))
+  `(let ((trail (rt-trail-index *runtime-data*)))
      (when (> trail !old-trail!)
-       (do ((trail-array *trail-array*))
+       (do ((trail-array (rt-trail-array *runtime-data*)))
 	   (nil)
 	 (setf (variable-value (svref trail-array trail)) nil)
 	 (when (= (decf trail) !old-trail!)
-	   (setq *trail* !old-trail!)
+	   (setf (rt-trail-index *runtime-data*) !old-trail!)
 	   (return nil))))))
 
 (defmacro safe-bind-variable-to-compound (var term trail? undo?)
@@ -163,41 +164,7 @@
             (,(car term) ,@args ,level ,continuation))
          `(,(car term) ,@args ,level ,continuation)))))
 
-;;; counter for number of inferences
-(defvar *ncalls* 0)
 
-;;; QUERY/0 is generated by the PTTPP compiler and not defined in the Lisp
-;;; code.  Declare its type to avoid compiler warnings.  We need to add a more
-;;; general solution, since the same problem appear for all predicates
-;;; generated by the compiler.  Figure out where the best place to add
-;;; declarations might be.
-;;;
-(declaim (ftype (function (t t) t) query/0))
-
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (defun wrap-count-calls (form)
-    (if (and *count-calls* (not (eq *name* 'query/0)))
-	`(progn (incf *ncalls*) ,form)
-	form)))
-
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (defun head-locs (terms &optional (name 'arg) nth)
-    (let* ((prop (if nth 'nth-arguments 'arguments))
-	   (n (if (numberp terms) terms (length terms)))
-	   (l (get name prop)))
-      (or (cdr (assoc n l))
-	  (let (w)
-	    (dotimes (i n)
-	      (push (if nth
-			`(nth ,(1+ i) ,name)
-			(intern (concatenate 'string "!" (symbol-name name)
-					     (princ-to-string (1+ i)) "!")
-				'pttpp))
-		    w))
-	    (setq w (nreverse w))
-	    (setf (get name prop) (cons (cons n w) l))
-	    w)))))
-
 ;; UNIFICATION
 
 (defun ground-term-p (term)
@@ -453,12 +420,6 @@
 
 ;; SUPPORT FOR OUTPUT AND TRACING
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (defmacro specifier (x)
-    `(get ,x 'specifier))
-  (defmacro precedence (x)
-    `(get ,x 'precedence)))
-
 ;;; use prefix, postfix, infix operators during printing
 (defvar *writing* t)
 
@@ -604,12 +565,9 @@
               (write-functor-and-arguments* ',nm . ,args)))))
 
 (defun wrap-call-fail-trace (form)
-  (if *traceable* `(trace-call-fail ,*name* ,form) form))
-
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (defun wrap-exit-redo-trace (form)
-    (if *traceable* `(trace-exit-redo ,*name* ,form) form)))
-
+  (if *traceable*
+      `(trace-call-fail ,*name* ,form)
+      form))
 
 ;; CONSECUTIVELY BOUNDED DEPTH-FIRST SEARCH
 
@@ -711,7 +669,8 @@
 	    `(with-n-subgoals ,n ,form)
 	    form))))
 
-(defun not-solvable (!arg1! !arg2! !level! !continuation! &aux (!old-trail! *trail*))
+(defun not-solvable (!arg1! !arg2! !level! !continuation!
+                     &aux (!old-trail! (rt-trail-index *runtime-data*)))
   ;; !arg2! specifies depth of search
   (incf !level!)
   (trace-call-fail
@@ -802,7 +761,7 @@
 		    (t (error "Unrecognized first argument type ~A" type)))
 	 ,(wrap-count-calls
            (wrap-exit-redo-trace `(funcall !continuation! !level!)))
-	 (if (= *trail* !old-trail!)
+	 (if (= (rt-trail-index *runtime-data*) !old-trail!)
 	     (return t)
 	     (undo-bindings))))))
 

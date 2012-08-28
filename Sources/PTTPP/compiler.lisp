@@ -71,15 +71,16 @@
                     (list 'quote term))
 		   (t (list* 'list (list 'quote (car term)) args)))))))
 
-(defun term-constructors (terms vars &aux newterms)
-  (setq newterms (mapcar #'(lambda (term)
-                             (term-constructor term vars))
-                         terms))
-  (cond ((every #'(lambda (x)
-                    (and (not (atom x)) (eq (car x) 'quote)))
-                newterms)
-         (list 'quote terms))
-	(t (cons 'list newterms))))
+(defun term-constructors (terms vars)
+  (let ((newterms nil))
+    (setf newterms (mapcar #'(lambda (term)
+                               (term-constructor term vars))
+                           terms))
+    (cond ((every #'(lambda (x)
+                      (and (not (atom x)) (eq (car x) 'quote)))
+                  newterms)
+           (list 'quote terms))
+          (t (cons 'list newterms)))))
 
 (defun wrap-progn (forms)
   (cond ((null forms) nil)
@@ -109,9 +110,13 @@
                   variables)
 		 form))))
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (defmacro invisible-functor-p (x)
-    `(get ,x 'invisible-functor)))
+#+5am
+(5am:test test-stack-list-new-variables
+  (5am:is (equal '(foo bar)
+                 (stack-list-new-variables '() '(foo bar))))
+  (5am:is (equal '(let ((a (new-variable 'a !level!)))
+                   (foo bar))
+                 (stack-list-new-variables '(a) '(foo bar)))))
 
 (defun clause-body-length (body &optional fl)
   (cond ((atom body) 0)
@@ -136,92 +141,186 @@
 	((invisible-functor-p (car body)) 0)
 	(t 1)))
 
+(defun compile-body-cut (continuation)
+  `(progn 
+     ,continuation
+     (undo-bindings)
+     (return-from ,*name* nil)))
+
+(defun compile-body-question-bang (continuation)
+  (if (member *first-argument-type*
+              '(:variable-bound-to-constant-first-argument
+                :variable-bound-to-compound-first-argument))
+      continuation
+      `(progn
+         ,continuation
+         (when (= (rt-trail-index *runtime-data*) !old-trail!)
+           (return-from ,*name* nil)))))
+
+(defun compile-body-search (body vars unbound continuation)
+  (compile-clause-body1
+   `(,+and-connective+ (begin-search
+                        ,(caddr body) ,(car (cdddr body)) ,(cadr (cdddr body)))
+                       (,+and-connective+ ,(cadr body) end-search))
+   vars unbound continuation))
+
+(defun compile-body-and (body vars unbound continuation)
+  (cond ((and (not (atom (cadr body)))
+              (eq (car (cadr body)) +and-connective+))
+         (compile-clause-body1
+          `(,+and-connective+
+            ,(cadr (cadr body))
+            (,+and-connective+ ,(caddr (cadr body)) ,(caddr body)))
+          vars unbound continuation))
+        ((and (not (atom (cadr body)))
+              (eq (car (cadr body)) +or-connective+))
+         (compile-clause-body1
+          `(,+or-connective+ (,+and-connective+ ,(cadr (cadr body)) ,(caddr body))
+                             (,+and-connective+ ,(caddr (cadr body)) ,(caddr body)))
+          vars unbound continuation))
+        (t (compile-clause-body1 (cadr body) vars unbound
+                                 (compile-clause-body1
+                                  (caddr body)
+                                  vars
+                                  (remove-if #'(lambda (v)
+                                                 (variable-occurs-in-term-p v (cadr body)))
+                                             unbound)
+                                  continuation)))))
+
+(defun compile-body-or (body vars unbound continuation)
+  (let ((x (compile-clause-body1 (cadr body) vars unbound continuation))
+        (y (compile-clause-body1 (caddr body) vars unbound continuation)))
+    (cond ((and (not (atom x)) (eq (car x) 'progn))
+           (cond ((and (not (atom y)) (eq (car y) 'progn))
+                  `(progn ,@(cdr x) ,@(cdr y)))
+                 (t `(progn ,@(cdr x) ,y))))
+          ((and (not (atom y)) (eq (car y) 'progn))
+           `(progn ,x ,@(cdr y)))
+          (t `(progn ,x ,y)))))
+
+(defun compile-body-default (body vars unbound continuation)
+  `(pcall ,body
+       (,(remove-if-not #'(lambda (v)
+                            (variable-occurs-in-term-p v body))
+                        vars)
+        ,(remove-if-not #'(lambda (v)
+                            (variable-occurs-in-term-p v body))
+                        unbound))
+       !level!
+       ,(if (and (not (atom continuation))
+                 (eq (car continuation) 'funcall)
+                 (eq (caddr continuation) '!level!))
+            (cadr continuation)
+            `(function (lambda (!new-level!)
+               ;; WARNING: PUT !LEVEL! INSIDE MACRO IF NO SUBST DESIRED
+               ,(subst '!new-level! '!level! continuation))))))
+
 (defun compile-clause-body1 (body vars unbound continuation)
   (cond ((eq body '!)
-         `(progn ,continuation (undo-bindings) (return-from ,*name* nil)))
+         (compile-body-cut continuation))
 	((eq body '?!)
-         (if (member *first-argument-type*
-                     '(:variable-bound-to-constant-first-argument
-                       :variable-bound-to-compound-first-argument))
-             continuation
-             `(progn
-                ,continuation
-                (when (= *trail* !old-trail!) (return-from ,*name* nil)))))
-	((eq body 'end-search) `(end-search ,continuation))
+         (compile-body-question-bang continuation))
+	((eq body 'end-search) 
+         `(end-search ,continuation))
 	((member (car body) '(search/1 search/2 search/3 search/4))
-	 (compile-clause-body1
-          `(,+and-connective+
-            (begin-search ,(caddr body) ,(car (cdddr body)) ,(cadr (cdddr body)))
-            (,+and-connective+ ,(cadr body) end-search))
-          vars unbound continuation))
+         (compile-body-search body vars unbound continuation))
 	((equal body '(true/0)) continuation)
 	((equal body '(fail/0)) nil)
 	((equal body '(false/0)) nil)
 	((eq (car body) 'nsubgoals/1) continuation)
 	((eq (car body) +and-connective+)
-	 (cond ((and (not (atom (cadr body)))
-                     (eq (car (cadr body)) +and-connective+))
-		(compile-clause-body1
-                 `(,+and-connective+
-                   ,(cadr (cadr body))
-                   (,+and-connective+ ,(caddr (cadr body)) ,(caddr body)))
-                 vars unbound continuation))
-	       ((and (not (atom (cadr body)))
-                     (eq (car (cadr body)) +or-connective+))
-		(compile-clause-body1
-                 `(,+or-connective+ (,+and-connective+ ,(cadr (cadr body)) ,(caddr body))
-                                  (,+and-connective+ ,(caddr (cadr body)) ,(caddr body)))
-                 vars unbound continuation))
-               ;;; TODO: This indentation is atrocious --tc
-	       (t (compile-clause-body1
-                   (cadr body) vars unbound
-                   (compile-clause-body1
-                    (caddr body) vars
-                    (remove-if #'(lambda (v)
-                                   (variable-occurs-in-term-p v (cadr body)))
-                               unbound)
-                    continuation)))))
+         (compile-body-and body vars unbound continuation))
 	((eq (car body) +or-connective+)
-	 (let ((x (compile-clause-body1 (cadr body) vars unbound continuation))
-	       (y (compile-clause-body1 (caddr body) vars unbound continuation)))
-	   (cond ((and (not (atom x)) (eq (car x) 'progn))
-		  (cond ((and (not (atom y)) (eq (car y) 'progn))
-                         `(progn ,@(cdr x) ,@(cdr y)))
-			(t `(progn ,@(cdr x) ,y))))
-		 ((and (not (atom y)) (eq (car y) 'progn))
-                  `(progn ,x ,@(cdr y)))
-		 (t `(progn ,x ,y)))))
-	(t `(pcall ,body
-		   (,(remove-if-not #'(lambda (v)
-                                        (variable-occurs-in-term-p v body))
-                                    vars)
-		    ,(remove-if-not #'(lambda (v)
-                                        (variable-occurs-in-term-p v body))
-                                    unbound))
-		   !level!
-		   ,(if (and (not (atom continuation))
-                             (eq (car continuation) 'funcall)
-                             (eq (caddr continuation) '!level!))
-			(cadr continuation)
-			`(function (lambda (!new-level!)
-                           ;; WARNING: PUT !LEVEL! INSIDE MACRO IF NO SUBST DESIRED
-                           ,(subst '!new-level! '!level! continuation))))))))
+         (compile-body-or body vars unbound continuation))
+	(t (compile-body-default body vars unbound continuation))))
 
 (defun compile-clause-body (body vars unbound)
   (if (equal body '(true/0))
       ;;  automatically cut if unit clause subsumes goal
-      (setq body '?!))
+      (setf body '?!))
   (let* ((length (clause-body-length body))
 	 (nonunit (> length 0))
 	 (*incomplete-inference* (or *incomplete-inference* (not nonunit)))
 	 (*allow-repeated-goals* (or *allow-repeated-goals* (not nonunit)))
-	 (x (compile-clause-body1
-             body vars unbound
-             (wrap-pop-ancestor
-              (wrap-exit-redo-trace
-               `(funcall !continuation! !level!))))))
+	 (x (compile-clause-body1 body vars unbound
+                                  (wrap-pop-ancestor
+                                   (wrap-exit-redo-trace
+                                    `(funcall !continuation! !level!))))))
     `(progn 
-       ,(wrap-count-calls (wrap-push-ancestor (wrap-undo-bindings x))))))
+       ,(wrap-count-calls
+         (wrap-push-ancestor
+          (wrap-undo-bindings x))))))
+
+(defun compile-clause-with-unbound-head
+    (headpats headlocs body vars unbound trail-is-nil)
+  (if (and (not (variable-occurs-in-terms-p (car headpats) (cdr headpats)))
+           (not (variable-occurs-in-term-p (car headpats) body)))
+      (compile-clause1 (cdr headpats) (cdr headlocs)
+                       body vars unbound trail-is-nil)
+      (if (atom (car headlocs))
+          (compile-clause1
+           (replace-variable-in-terms
+            (car headpats) (car headlocs) (cdr headpats))
+           (cdr headlocs)
+           (replace-variable-in-term
+            (car headpats) (car headlocs) body)
+           (cons (car headlocs) vars)
+           (remove (car headpats) unbound) trail-is-nil)
+          `(let ((,(car headpats) ,(car headlocs)))
+             ,(compile-clause1 (cdr headpats) (cdr headlocs) body
+                               vars (remove (car headpats) unbound)
+                               trail-is-nil)))))
+
+(defun compile-clause-with-variable-head
+    (headpats headlocs body vars unbound trail-is-nil)
+  (cond ((and (eq (car headpats) '!arg1!)
+              (member *first-argument-type* 
+                      '(:constant-first-argument
+                        :variable-bound-to-constant-first-argument)))
+         `(when (unify-argument-with-constant
+                 ,(car headlocs) !arg1! :trail-is-nil ,trail-is-nil)
+            ,(compile-clause1
+              (cdr headpats) (cdr headlocs) body vars unbound nil)))
+        ((and (eq (car headpats) '!arg1!)
+              (member *first-argument-type*
+                      '(:compound-first-argument
+                        :variable-bound-to-compound-first-argument)))
+         `(when (unify-argument-with-compound
+                 ,(car headlocs) !arg1! :unsafe ,*unsafe-unification*)
+            ,(compile-clause1 (cdr headpats) (cdr headlocs)
+                              body vars unbound nil)))
+        (t `(when (,(if *unsafe-unification*
+                        'unsafe-maybe-trails-unify
+                        'maybe-trails-unify)
+                   ,(car headlocs) ,(car headpats) !old-trail! !level!)
+              ,(compile-clause1 (cdr headpats) (cdr headlocs)
+                                body vars unbound nil)))))
+
+(defun compile-clause-with-atomic-head
+    (headpats headlocs body vars unbound trail-is-nil)
+  `(when (unify-argument-with-constant ,(car headlocs)
+                                       ,(if (and (not (atom (car headpats)))
+                                                 (eq (caar headpats) 'nth))
+                                            (car headpats)
+                                            `',(car headpats))
+                                       :trail-is-nil ,trail-is-nil)
+     ,(compile-clause1 (cdr headpats) (cdr headlocs) body vars unbound nil)))
+
+(defun compile-clause-default
+    (headpats headlocs body vars unbound trail-is-nil)
+  (let ((newunbound (remove-if #'(lambda (v)
+                                   (variable-occurs-in-term-p v (car headpats)))
+                               unbound)))
+    (stack-list-new-variables
+     (remove-if-not #'(lambda (v)
+                        (variable-occurs-in-term-p v (car headpats)))
+                    unbound)
+     `(let ((!compound! ,(term-constructor (car headpats) vars)))
+        (when (unify-argument-with-compound
+               ,(car headlocs) !compound! :trail-is-nil
+               ,trail-is-nil :unsafe ,*unsafe-unification*)
+          ,(compile-clause1
+            (cdr headpats) (cdr headlocs) body vars newunbound nil))))))
 
 (defun compile-clause1 (headpats headlocs body vars unbound trail-is-nil)
   (cond ((null headpats)
@@ -230,74 +329,22 @@
          (compile-clause1 (cdr headpats) (cdr headlocs)
                           body vars unbound trail-is-nil))
 	((member (car headpats) unbound)
-	 (if (and (not (variable-occurs-in-terms-p (car headpats) (cdr headpats)))
-		  (not (variable-occurs-in-term-p (car headpats) body)))
-	     (compile-clause1 (cdr headpats) (cdr headlocs)
-                              body vars unbound trail-is-nil)
-	     (if (atom (car headlocs))
-		 (compile-clause1
-		   (replace-variable-in-terms
-                    (car headpats) (car headlocs) (cdr headpats))
-		   (cdr headlocs)
-		   (replace-variable-in-term
-                    (car headpats) (car headlocs) body)
-		   (cons (car headlocs) vars)
-                   (remove (car headpats) unbound) trail-is-nil)
-		 `(let ((,(car headpats) ,(car headlocs)))
-		    ,(compile-clause1 (cdr headpats) (cdr headlocs) body
-				      vars (remove (car headpats) unbound)
-                                      trail-is-nil)))))
+         (compile-clause-with-unbound-head
+          headpats headlocs body vars unbound trail-is-nil))
 	((member (car headpats) vars)
-	 (cond ((and (eq (car headpats) '!arg1!)
-                     (member *first-argument-type* 
-                             '(:constant-first-argument
-                               :variable-bound-to-constant-first-argument)))
-		`(when (unify-argument-with-constant
-                        ,(car headlocs) !arg1! :trail-is-nil ,trail-is-nil)
-		   ,(compile-clause1
-                     (cdr headpats) (cdr headlocs) body vars unbound nil)))
-	       ((and (eq (car headpats) '!arg1!)
-                     (member *first-argument-type*
-                             '(:compound-first-argument
-                               :variable-bound-to-compound-first-argument)))
-		`(when (unify-argument-with-compound
-                        ,(car headlocs) !arg1! :unsafe ,*unsafe-unification*)
-		   ,(compile-clause1 (cdr headpats) (cdr headlocs)
-                                     body vars unbound nil)))
-	       (t `(when (,(if *unsafe-unification*
-                               'unsafe-maybe-trails-unify
-                               'maybe-trails-unify)
-			  ,(car headlocs) ,(car headpats) !old-trail! !level!)
-		     ,(compile-clause1 (cdr headpats) (cdr headlocs)
-                                       body vars unbound nil)))))
+         (compile-clause-with-variable-head
+          headpats headlocs body vars unbound trail-is-nil))
 	((or (atom (car headpats)) (eq (caar headpats) 'nth))
-	 `(when (unify-argument-with-constant
-                 ,(car headlocs)
-                 ,(if (and (not (atom (car headpats)))
-                           (eq (caar headpats) 'nth))
-                      (car headpats)
-                      `',(car headpats))
-                 :trail-is-nil ,trail-is-nil)
-	    ,(compile-clause1 (cdr headpats) (cdr headlocs)
-                              body vars unbound nil)))
-	(t (let ((newunbound (remove-if
-                              #'(lambda (v)
-                                  (variable-occurs-in-term-p v (car headpats)))
-                              unbound)))
-	     (stack-list-new-variables
-	       (remove-if-not #'(lambda (v)
-                                  (variable-occurs-in-term-p v (car headpats)))
-                              unbound)
-	       `(let ((!compound! ,(term-constructor (car headpats) vars)))
-		  (when (unify-argument-with-compound
-			  ,(car headlocs) !compound! :trail-is-nil
-                          ,trail-is-nil :unsafe ,*unsafe-unification*)
-		    ,(compile-clause1 (cdr headpats) (cdr headlocs)
-                                      body vars newunbound nil))))))))
+         (compile-clause-with-atomic-head
+          headpats headlocs body vars unbound trail-is-nil))
+	(t
+         (compile-clause-default
+          headpats headlocs body vars unbound trail-is-nil))))
 
 (defun compile-clause
-    (headpats headlocs body vars unbound &aux (trail-is-nil t))
-  (compile-clause1 headpats headlocs body vars unbound trail-is-nil))
+    (headpats headlocs body vars unbound)
+  (let ((trail-is-nil t))
+    (compile-clause1 headpats headlocs body vars unbound trail-is-nil)))
 
 (defun all-distinct-variable-arguments (clause variables)
   (let (seen)
@@ -331,8 +378,8 @@
                    (return-from ,*name* nil))))
 	   (nreverse compiled-clauses))))
     (declare (special *clausenum*))
-    (setq clause (car clauses))
-    (setq *clausenum* (cdr (assoc clause *clause-numbers*)))
+    (setf clause (car clauses))
+    (setf *clausenum* (cdr (assoc clause *clause-numbers*)))
     (unless (not (atom (first (clause-args clause))))
       (push (cond ((eq (first (clause-args clause)) '_)
 		   (wrap-depth-test
@@ -356,8 +403,8 @@
 			(all-constant-arguments clause variables)
 			(equal (clause-body clause) (clause-body (cadr clauses)))
 			(all-constant-arguments (cadr clauses) variables))
-		   (setq *clausenum* nil)
-		   (setq clauses (cdr clauses))
+		   (setf *clausenum* nil)
+		   (setf clauses (cdr clauses))
 		   (do ((values (list (if (= *arity* 1)
                                           (first (clause-args (car clauses)))
                                           (clause-args (car clauses)))
@@ -384,7 +431,7 @@
                                      (cdr (head-locs (clause-args clause)))
                                      (clause-body clause) variables unbound))
 				(clause-body clause)))))
-		     (setq clauses (cdr clauses))))
+		     (setf clauses (cdr clauses))))
 		  (t `(when (eql !arg1! ',(first (clause-args clause)))
 			,(wrap-depth-test
 			   (compile-clause
@@ -414,8 +461,8 @@
                    (return-from ,*name* nil))))
 	   (nreverse compiled-clauses))))
     (declare (special *clausenum*))
-    (setq clause (car clauses))
-    (setq *clausenum* (cdr (assoc clause *clause-numbers*)))
+    (setf clause (car clauses))
+    (setf *clausenum* (cdr (assoc clause *clause-numbers*)))
     (unless (and (atom (first (clause-args clause)))
 		 (not (eq (first (clause-args clause)) '_))
 		 (not (member (first (clause-args clause)) variables)))
@@ -471,8 +518,8 @@
                    (return-from ,*name* nil))))
 	   (nreverse compiled-clauses))))
     (declare (special *clausenum*))
-    (setq clause (car clauses))
-    (setq *clausenum* (cdr (assoc clause *clause-numbers*)))
+    (setf clause (car clauses))
+    (setf *clausenum* (cdr (assoc clause *clause-numbers*)))
     (push (cond ((eq (first (clause-args clause)) '_)
 		 (wrap-depth-test
 		   (compile-clause
@@ -495,8 +542,8 @@
 		      (all-constant-arguments clause variables)
 		      (equal (clause-body clause) (clause-body (cadr clauses)))
 		      (all-constant-arguments (cadr clauses) variables))
-		 (setq *clausenum* nil)
-		 (setq clauses (cdr clauses))
+		 (setf *clausenum* nil)
+		 (setf clauses (cdr clauses))
 		 (do ((*first-argument-type* :variable-bound-to-constant-first-argument)
 		      (values (list (if (= *arity* 1)
                                         (first (clause-args (car clauses)))
@@ -528,7 +575,7 @@
                                     (clause-body clause) variables unbound)
                                   (undo-bindings)))
                            (clause-body clause))))
-		   (setq clauses (cdr clauses))))
+		   (setf clauses (cdr clauses))))
 		((atom (first (clause-args clause)))
 		 (let ((*first-argument-type* :variable-bound-to-constant-first-argument))
 		   (wrap-depth-test
@@ -574,163 +621,163 @@
                                ((:incomplete-inference *incomplete-inference*) nil)
                                ((:allow-repeated-goals *allow-repeated-goals*) nil)
                                (split-procedure nil)
-                               (collapse-clauses nil)
-                          &aux (*arity* (get *name* 'arity)) 
-                               parameters
-                               (unbound variables)
-                               (lisp-compile-time 0))
+                               (collapse-clauses nil))
   (declare (ignore collapse-clauses))
-  (when (eq *name* 'query/0)
-    (setq *traceable* nil)
-    (setq *unbounded-search* t)
-    (setq *incomplete-inference* t)
-    (setq *allow-repeated-goals* t))
-  (if (= *arity* 0) (setq split-procedure nil))
-  (if (not *trace-calls*) (setq *traceable* nil))
-  (setq parameters
-        (list :count-calls *count-calls*
-              :clause-numbers
-              (mapcar #'(lambda (clause)
-                          (cdr (assoc clause *clause-numbers* :test #'equal)))
-                      clauses)
-              :variables variables
-              :traceable *traceable*
-              :unbounded-search *unbounded-search*
-              :unsafe-unification *unsafe-unification*
-              :incomplete-inference *incomplete-inference*
-              :allow-repeated-goals *allow-repeated-goals*
-              :split-procedure split-procedure))
-  (when (or *recompile*
-	    (not (equal clauses (get *name* 'compiled-clauses)))
-	    (not (equal parameters (get *name* 'compiled-parameters))))
-    (let (arglist auxlist namec names namev defn defnc defns defnv)
-      (when (not *allow-repeated-goals*)
-	(dolist (clause clauses (setq *allow-repeated-goals* t))
-	  (when (> (clause-body-length (clause-body clause)) 0)
-	    (return))))
-      (setq arglist
-            (append (head-locs *arity*) '(!level! !continuation!)))
-      (setq auxlist
-            (append arglist '(&aux (!old-trail! *trail*))))
-      (when (or (not *allow-repeated-goals*) (not *incomplete-inference*))
-	(eval `(defvar ,(ancestors-name *name*) nil))
-	(eval `(defvar ,(ancestors-name (negated-functor *name*)) nil)))
-      (setq defn
-            (list 
-             'lambda
-             (if (and split-procedure (not (= *arity* 0))) arglist auxlist)
-             '(declare (ignorable !old-trail!))
-             `(incf !level!)
-             (list 'block *name*
-                   (wrap-call-fail-trace
-                    (cond ((= *arity* 0)
-                           (do ((*first-argument-type* nil)
-                                (clauses clauses (cdr clauses))
-                                (compiled-clauses nil)
-                                (clause)
-                                (*clausenum*))
-                               ((null clauses)
-                                (wrap-progn
-                                 (nconc
-                                  (if (not *allow-repeated-goals*)
-                                      (list
-                                       `(when ,(identical-to-ancestor-call
-                                                *name* 0 nil)
-                                          (return-from ,*name* nil))))
-                                  (if (not *incomplete-inference*)
-                                      (list
-                                       `(when ,(reduce-by-ancestor-call
-                                                *name* 0 nil)
-                                          (return-from ,*name* nil))))
-                                  (nreverse compiled-clauses))))
-                             (declare (special *clausenum*))
-                             (setq clause (car clauses))
-                             (setq *clausenum*
-                                   (cdr (assoc clause *clause-numbers*)))
-                             (push (wrap-depth-test
-                                    (compile-clause
-                                     nil nil (clause-body clause)
-                                     variables unbound)
-                                    (clause-body clause))
-                                   compiled-clauses)))
-                          (split-procedure
-                           (setq namec
-                                 (intern 
-                                  (concatenate 'string (symbol-name *name*) "C")
-                                  'pttpp))
-                           (setq names
-                                 (intern
-                                  (concatenate 'string (symbol-name *name*) "S")
-                                  'pttpp))
-                           (setq namev
-                                 (intern
-                                  (concatenate 'string (symbol-name *name*) "V")
-                                  'pttpp))
-                           (let ((nm (functor-name *name*)))
-                             (setf (get namec 'name) nm)
-                             (setf (get names 'name) nm)
-                             (setf (get namev 'name) nm)
-                             (setf (get namec 'arity) *arity*)
-                             (setf (get names 'arity) *arity*)
-                             (setf (get namev 'arity) *arity*))
-                           (setq defnc
-                                 (list
-                                  'lambda
-                                  auxlist
-                                  (list 'block *name*
-                                        (wrap-bind-args
-                                         (compile-procedure-for-constant-first-argument
-                                          clauses variables)))))
-                           (setq defns
-                                 (list
-                                  'lambda
-                                  auxlist
-                                  (list 'block *name*
-                                        (wrap-bind-args
-                                         (compile-procedure-for-compound-first-argument
-                                          clauses variables)))))
-                           (setq defnv
-                                 (list
-                                  'lambda
-                                  auxlist
-                                  (list 'block *name*
-                                        (wrap-bind-args
-                                         (compile-procedure-for-variable-first-argument
-                                          clauses variables)))))
-                           `(dereference
-                                !arg1!
-                              :if-constant  (,namec . ,arglist)
-                              :if-compound  (,names . ,arglist)
-                              :if-variable  (,namev . ,arglist)))
-                          (t (wrap-bind-args
-                              `(dereference
-                                   !arg1!
-                                 :if-constant
-                                 ,(compile-procedure-for-constant-first-argument
-                                   clauses variables)
-                                 :if-compound
-                                 ,(compile-procedure-for-compound-first-argument
-                                   clauses variables)
-                                 :if-variable
-                                 ,(compile-procedure-for-variable-first-argument
-                                   clauses variables)))))))))
-      (when *print-compile-names*
-        (format t "~&~A compiled from PTTPP to LISP" *name*))
-      (setq lisp-compile-time (get-internal-run-time))
-      (when (and split-procedure (> *arity* 0))
-	(compile namec defnc)
-	(compile names defns)
-	(compile namev defnv))
-      (compile *name* defn)
-      (when *print-compile-names*
-        (format t "~&~A compiled from LISP to machine code" *name*))
-      (setq lisp-compile-time (- (get-internal-run-time) lisp-compile-time)))
-    (setf (get *name* 'compiled-clauses) clauses)
-    (setf (get *name* 'compiled-parameters) parameters))
-  lisp-compile-time)
+  (let ((*arity* (get *name* 'arity)) 
+        parameters
+        (unbound variables)
+        (lisp-compile-time 0))
+    (when (eq *name* 'query/0)
+      (setf *traceable* nil)
+      (setf *unbounded-search* t)
+      (setf *incomplete-inference* t)
+      (setf *allow-repeated-goals* t))
+    (if (= *arity* 0) (setf split-procedure nil))
+    (if (not *trace-calls*) (setf *traceable* nil))
+    (setf parameters
+          (list :count-calls *count-calls*
+                :clause-numbers
+                (mapcar #'(lambda (clause)
+                            (cdr (assoc clause *clause-numbers* :test #'equal)))
+                        clauses)
+                :variables variables
+                :traceable *traceable*
+                :unbounded-search *unbounded-search*
+                :unsafe-unification *unsafe-unification*
+                :incomplete-inference *incomplete-inference*
+                :allow-repeated-goals *allow-repeated-goals*
+                :split-procedure split-procedure))
+    (when (or *recompile*
+              (not (equal clauses (get *name* 'compiled-clauses)))
+              (not (equal parameters (get *name* 'compiled-parameters))))
+      (let (arglist auxlist namec names namev defn defnc defns defnv)
+        (when (not *allow-repeated-goals*)
+          (dolist (clause clauses (setf *allow-repeated-goals* t))
+            (when (> (clause-body-length (clause-body clause)) 0)
+              (return))))
+        (setf arglist
+              (append (head-locs *arity*) '(!level! !continuation!)))
+        (setf auxlist
+              (append arglist '(&aux (!old-trail! (rt-trail-index *runtime-data*)))))
+        (when (or (not *allow-repeated-goals*) (not *incomplete-inference*))
+          (eval `(defvar ,(ancestors-name *name*) nil))
+          (eval `(defvar ,(ancestors-name (negated-functor *name*)) nil)))
+        (setf defn
+              (list 
+               'lambda
+               (if (and split-procedure (not (= *arity* 0))) arglist auxlist)
+               '(declare (ignorable !old-trail!))
+               `(incf !level!)
+               (list 'block *name*
+                     (wrap-call-fail-trace
+                      (cond ((= *arity* 0)
+                             (do ((*first-argument-type* nil)
+                                  (clauses clauses (cdr clauses))
+                                  (compiled-clauses nil)
+                                  (clause)
+                                  (*clausenum*))
+                                 ((null clauses)
+                                  (wrap-progn
+                                   (nconc
+                                    (if (not *allow-repeated-goals*)
+                                        (list
+                                         `(when ,(identical-to-ancestor-call
+                                                  *name* 0 nil)
+                                            (return-from ,*name* nil))))
+                                    (if (not *incomplete-inference*)
+                                        (list
+                                         `(when ,(reduce-by-ancestor-call
+                                                  *name* 0 nil)
+                                            (return-from ,*name* nil))))
+                                    (nreverse compiled-clauses))))
+                               (declare (special *clausenum*))
+                               (setf clause (car clauses))
+                               (setf *clausenum*
+                                     (cdr (assoc clause *clause-numbers*)))
+                               (push (wrap-depth-test
+                                      (compile-clause
+                                       nil nil (clause-body clause)
+                                       variables unbound)
+                                      (clause-body clause))
+                                     compiled-clauses)))
+                            (split-procedure
+                             (setf namec
+                                   (intern 
+                                    (concatenate 'string (symbol-name *name*) "C")
+                                    'pttpp))
+                             (setf names
+                                   (intern
+                                    (concatenate 'string (symbol-name *name*) "S")
+                                    'pttpp))
+                             (setf namev
+                                   (intern
+                                    (concatenate 'string (symbol-name *name*) "V")
+                                    'pttpp))
+                             (let ((nm (functor-name *name*)))
+                               (setf (get namec 'name) nm)
+                               (setf (get names 'name) nm)
+                               (setf (get namev 'name) nm)
+                               (setf (get namec 'arity) *arity*)
+                               (setf (get names 'arity) *arity*)
+                               (setf (get namev 'arity) *arity*))
+                             (setf defnc
+                                   (list
+                                    'lambda
+                                    auxlist
+                                    (list 'block *name*
+                                          (wrap-bind-args
+                                           (compile-procedure-for-constant-first-argument
+                                            clauses variables)))))
+                             (setf defns
+                                   (list
+                                    'lambda
+                                    auxlist
+                                    (list 'block *name*
+                                          (wrap-bind-args
+                                           (compile-procedure-for-compound-first-argument
+                                            clauses variables)))))
+                             (setf defnv
+                                   (list
+                                    'lambda
+                                    auxlist
+                                    (list 'block *name*
+                                          (wrap-bind-args
+                                           (compile-procedure-for-variable-first-argument
+                                            clauses variables)))))
+                             `(dereference
+                                  !arg1!
+                                :if-constant  (,namec . ,arglist)
+                                :if-compound  (,names . ,arglist)
+                                :if-variable  (,namev . ,arglist)))
+                            (t (wrap-bind-args
+                                `(dereference
+                                     !arg1!
+                                   :if-constant
+                                   ,(compile-procedure-for-constant-first-argument
+                                     clauses variables)
+                                   :if-compound
+                                   ,(compile-procedure-for-compound-first-argument
+                                     clauses variables)
+                                   :if-variable
+                                   ,(compile-procedure-for-variable-first-argument
+                                     clauses variables)))))))))
+        (when *print-compile-names*
+          (format t "~&~A compiled from PTTPP to LISP" *name*))
+        (setf lisp-compile-time (get-internal-run-time))
+        (when (and split-procedure (> *arity* 0))
+          (compile namec defnc)
+          (compile names defns)
+          (compile namev defnv))
+        (compile *name* defn)
+        (when *print-compile-names*
+          (format t "~&~A compiled from LISP to machine code" *name*))
+        (setf lisp-compile-time (- (get-internal-run-time) lisp-compile-time)))
+      (setf (get *name* 'compiled-clauses) clauses)
+      (setf (get *name* 'compiled-parameters) parameters))
+    lisp-compile-time))
 
 (defun *print-clauses* (clauses variables)
-  (when variables
+    (when variables
     (fresh-line)
     (terpri)
     (cond ((null (cdr variables))
@@ -752,21 +799,21 @@
 
 (defun program (variables wffs &rest options)
   (let (clauses predicates wff-number start-time stop-time (lisp-compile-time 0))
-    (setq start-time (get-internal-run-time))
-    (setq wffs (canonicalize-functors-in-terms wffs))
-    (setq stop-time (get-internal-run-time))
+    (setf start-time (get-internal-run-time))
+    (setf wffs (canonicalize-functors-in-terms wffs))
+    (setf stop-time (get-internal-run-time))
     
     (when *print-clauses*
-      (setq wff-number 0)
-      (setq *clause-numbers* nil)
+      (setf wff-number 0)
+      (setf *clause-numbers* nil)
       (dolist (wff wffs)
 	(incf wff-number)
 	(push (cons wff wff-number) *clause-numbers*))
       (*print-clauses* wffs variables))
     
-    (setq start-time (- (get-internal-run-time) (- stop-time start-time)))
-    (setq wff-number 0)
-    (setq *clause-numbers* nil)
+    (setf start-time (- (get-internal-run-time) (- stop-time start-time)))
+    (setf wff-number 0)
+    (setf *clause-numbers* nil)
     (dolist (wff wffs)
       (incf wff-number)
       (let ((cls (clauses-from-wff wff)))
@@ -787,15 +834,15 @@
                               predicates)
 		     (pushnew (negated-functor (clause-pred (car clauses)))
                               predicates)))))))
-    (setq clauses (nreverse clauses))
-    (setq predicates (nreverse predicates))
+    (setf clauses (nreverse clauses))
+    (setf predicates (nreverse predicates))
     
     (dolist (pred predicates)
       (incf lisp-compile-time
             (apply #'compile-procedure
                    (list* pred variables (predicate-clauses pred clauses)
                           options))))
-    (setq stop-time (get-internal-run-time))
+    (setf stop-time (get-internal-run-time))
     
     (when *print-compile-times*
       (format t "~2&Compilation time: ~,3F seconds (PTTPP) + ~,3F seconds (LISP)~%"
@@ -821,9 +868,9 @@
     (when *print-success-notification*
       (if *print-trail*
 	  (format t "~&Success:  trail = ~A,~%~4Ttrail-array = ~W.~%"
-		  *trail*
-                  (make-array `(,(1+ *trail*))
-                              :displaced-to *trail-array*))
+		  (rt-trail-index *runtime-data*)
+                  (make-array `(,(1+ (rt-trail-index *runtime-data*)))
+                              :displaced-to (rt-trail-array *runtime-data*)))
 	  (format t "~&Success."))))
     (incf *number-of-solutions-found*)
   (if *single-solution*
@@ -834,16 +881,16 @@
   (when goal
     (apply #'program variables (list* `((<- (query) ,goal)) options)))
   (let (start-time stop-time value time)
-    (setq *ncalls* 0)
-    (setq *trail* -1)
-    (setq *trace-search-time* 0)
-    (setq *print-proof-time* 0)
-    (setq start-time (get-internal-run-time))
-    (setq value (catch 'query 
+    (setf *ncalls* 0)
+    (setf (rt-trail-index *runtime-data*) -1)
+    (setf *trace-search-time* 0)
+    (setf *print-proof-time* 0)
+    (setf start-time (get-internal-run-time))
+    (setf value (catch 'query 
 		  (query/0 0 #'query-success)))
-    (setq stop-time (get-internal-run-time))
+    (setf stop-time (get-internal-run-time))
     (when (> *ncalls* 0)
-      (setq time
+      (setf time
             (/ (max 1 (- stop-time start-time *trace-search-time* *print-proof-time*))
                (float internal-time-units-per-second)))
       (when *print-execution-time*
@@ -854,6 +901,10 @@
 
 ;; INPUT EXPRESSION CANONICALIZATION
 
+(defun ftype-for-functor (name arity)
+  `(ftype (function ,(mapcar (constantly t) (iota arity)) t)
+          ,name))
+
 (defun make-functor (name arity)
   (let ((l (get name 'functors)))
     (or (cdr (assoc arity l))
@@ -863,6 +914,7 @@
 	  (setf (get name 'functors) (cons (cons arity w) l))
 	  (setf (get w 'arity) arity)
 	  (setf (get w 'name) name)
+          (proclaim (ftype-for-functor w (+ arity 2)))
 	  w))))
 
 (defun negated-functor (name)
@@ -884,7 +936,7 @@
 	(if (digit-char-p (char s (1- n)))
 	    (do ((n (- n 2) (1- n)) (ch))
 		((= n 0) x)
-	      (setq ch (char s n))
+	      (setf ch (char s n))
 	      (cond ((digit-char-p ch))
 		    ((char= ch '#\/) (return (setf (get x 'name) (subseq s 0 n))))
 		    (t (return (setf (get x 'name) x)))))
@@ -898,8 +950,8 @@
 	(if arity
 	    (do ((n (- n 2) (1- n)) (tens 10 (* 10 tens)) (ch) (num))
 		((= n 0) '?)
-	      (setq ch (char s n))
-	      (setq num (digit-char-p ch))
+	      (setf ch (char s n))
+	      (setf num (digit-char-p ch))
 	      (cond (num (incf arity (* tens num)))
 		    ((char= ch '#\/) (setf (get x 'arity) arity) (return arity))
 		    (t (return '?))))
@@ -949,7 +1001,7 @@
 (defun convert-string-to-list (s)
   (do ((i (1- (length s)) (1- i)) (w '|[]|))
       ((< i 0) w)
-    (setq w `(cons/2 ,(char-code (char s i)) ,w))))
+    (setf w `(cons/2 ,(char-code (char s i)) ,w))))
 
 (defun canonicalize-functors-in-term (term)
   (cond ((atom term)
@@ -994,19 +1046,20 @@
 
 ;; CONVERSION OF NONCLAUSAL INPUTS TO CLAUSE FORM
 
-(defun clause-body-for-literal (lit wff &aux ~f)
-  (cond ((atom wff) wff)
-	((eq (car wff) +and-connective+)
-         (disjoin (clause-body-for-literal lit (cadr wff))
-                  (clause-body-for-literal lit (caddr wff))))
-	((eq (car wff) +or-connective+)
-         (conjoin (clause-body-for-literal lit (cadr wff))
-                  (clause-body-for-literal lit (caddr wff))))
-	((equal lit wff) '(true/0))
-	((and (eq (car lit) (setq ~f (negated-functor (car wff))))
-              (equal (cdr lit) (cdr wff)))
-         '(false/0))
-	(t (cons ~f (cdr wff)))))
+(defun clause-body-for-literal (lit wff)
+  (let ((~f nil))
+    (cond ((atom wff) wff)
+          ((eq (car wff) +and-connective+)
+           (disjoin (clause-body-for-literal lit (cadr wff))
+                    (clause-body-for-literal lit (caddr wff))))
+          ((eq (car wff) +or-connective+)
+           (conjoin (clause-body-for-literal lit (cadr wff))
+                    (clause-body-for-literal lit (caddr wff))))
+          ((equal lit wff) '(true/0))
+          ((and (eq (car lit) (setf ~f (negated-functor (car wff))))
+                (equal (cdr lit) (cdr wff)))
+           '(false/0))
+          (t (cons ~f (cdr wff))))))
 
 (defun literals-in-wff (wff &optional literals)
   (cond ((and (not (atom wff))

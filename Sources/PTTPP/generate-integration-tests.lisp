@@ -28,7 +28,7 @@
              (*single-solution* t))
          ,@body
          (let ((bindings '())
-               (tests `((5am:is (= ,*trail* *trail*))))
+               (tests `((5am:is (= ,(rt-trail-index *runtime-data*) (rt-trail-index *runtime-data*)))))
                (counter 0))
            (labels ((name (prefix)
                       (intern (format nil "~A-~A" prefix (incf counter))))
@@ -64,8 +64,9 @@
                             (t
                              ;; Do nothing
                              nil))))
-             (dotimes (i (1+ *trail*))
-               (walk (aref *trail-array* i) `(aref *trail-array* ,i)))
+             (dotimes (i (1+ (rt-trail-index *runtime-data*)))
+               (walk (aref (rt-trail-array *runtime-data*) i)
+                     `(aref (rt-trail-array *runtime-data*) ,i)))
              `(define-integration-test ,',name
                 ,@',body
                 (let* (,@(nreverse bindings))

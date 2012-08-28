@@ -901,9 +901,36 @@
 
 ;; INPUT EXPRESSION CANONICALIZATION
 
-(defun ftype-for-functor (name arity)
-  `(ftype (function ,(mapcar (constantly t) (iota arity)) t)
+(defglobal *arithmetic-operators*
+    '(|+/1| |-/1| |+/2| |-/2| */2 //2 mod/2 cputime/0))
+
+(defglobal *builtins-with-optional-args*
+    '(trace/0 notrace/0 spy/1 nospy/1 nodebug/0 debugging/0 op/3))
+
+;;; FIXME: The last-but-one argument should be FIXNUM instead of T, but this
+;;; leads to compiler warnings from SBCL because the variable !level! is
+;;; assigned to from places that are not declared as fixnums.
+(defun ftype-for-functor (name arity functionp optionals)
+  `(ftype (function (,@(mapcar (constantly t) (iota arity))
+                     ,@(cond (functionp '())
+                             (optionals '(&optional t function))
+                             (t '(t function))))
+                    t)
           ,name))
+#+5am
+(5am:test test-ftype-for-functor
+  (5am:is (equal '(ftype (function (t function) t) foo)
+                 (ftype-for-functor 'foo 0 nil nil)))
+  (5am:is (equal '(ftype (function (t t t function) t) foo)
+                 (ftype-for-functor 'foo 2 nil nil)))
+  (5am:is (equal '(ftype (function () t) foo)
+                 (ftype-for-functor 'foo 0 t nil)))
+  (5am:is (equal '(ftype (function (t t) t) foo)
+                 (ftype-for-functor 'foo 2 t nil)))
+  (5am:is (equal '(ftype (function (&optional t function) t) foo)
+                 (ftype-for-functor 'foo 0 nil t)))
+  (5am:is (equal '(ftype (function (t t &optional t function) t) foo)
+                 (ftype-for-functor 'foo 2 nil t))))
 
 (defun make-functor (name arity)
   (let ((l (get name 'functors)))
@@ -914,8 +941,10 @@
 	  (setf (get name 'functors) (cons (cons arity w) l))
 	  (setf (get w 'arity) arity)
 	  (setf (get w 'name) name)
-          (proclaim (ftype-for-functor w (+ arity 2)))
-	  w))))
+          (let ((functionp (member w *arithmetic-operators*))
+                (optionals (member w *builtins-with-optional-args*)))
+            (proclaim (ftype-for-functor w arity functionp optionals)))
+          w))))
 
 (defun negated-functor (name)
   (or (get name 'negation)

@@ -33,7 +33,7 @@
 ;;; proclaimed by MAKE-FUNCTOR, but this happens too late for QUERY/0
 ;;; to suppress this warning.)
 ;;;
-(declaim (ftype (function (t t) t) query/0))
+(declaim (ftype (function (t function) t) query/0))
 
 ;;; counter for number of inferences
 (defvar *ncalls* 0)

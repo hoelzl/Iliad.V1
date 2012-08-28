@@ -276,7 +276,7 @@
       (funcall !continuation! !level!)))
 
 (setf (invisible-functor-p 'spy/1) t)
-(defun spy/1 (x &optional (!level! 0)!continuation!)
+(defun spy/1 (x &optional (!level! 0) !continuation!)
   ;; takes single predicate argument, e.g., (spy reverse/2) (spy reverse),
   ;; (spy (reverse 2)), (spy [reverse,concatenate]), etc. not allowed
   (incf !level!)
@@ -397,7 +397,7 @@
 (defun mod/2 (m n)
   (rem m n))
 
-(defun cputime/0 nil
+(defun cputime/0 ()
   (get-internal-run-time))
 
 

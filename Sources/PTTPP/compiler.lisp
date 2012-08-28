@@ -901,6 +901,10 @@
 
 ;; INPUT EXPRESSION CANONICALIZATION
 
+(defun ftype-for-functor (name arity)
+  `(ftype (function ,(mapcar (constantly t) (iota arity)) t)
+          ,name))
+
 (defun make-functor (name arity)
   (let ((l (get name 'functors)))
     (or (cdr (assoc arity l))
@@ -910,6 +914,7 @@
 	  (setf (get name 'functors) (cons (cons arity w) l))
 	  (setf (get w 'arity) arity)
 	  (setf (get w 'name) name)
+          (proclaim (ftype-for-functor w (+ arity 2)))
 	  w))))
 
 (defun negated-functor (name)

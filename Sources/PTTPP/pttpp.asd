@@ -11,7 +11,8 @@
 	       #:fiveam
                #:iterate)
   :components ((:file "package")
+	       (:file "bootstrap")
 	       (:file "utilities")
-               (:file "pttpp-runtime")
-               (:file "pttpp-compiler")
-               (:file "pttpp-builtins")))
+               (:file "runtime")
+               (:file "compiler")
+               (:file "builtins")))

@@ -77,7 +77,7 @@
     :if-compound  (funcall !continuation! !level!)))
 
 (defun functor/3 (term functor arity !level! !continuation!
-                  &aux (!old-trail! *trail*))
+                  &aux (!old-trail! (rt-trail-index *runtime-data*)))
   (incf !level!)
   (dereference
       term
@@ -136,7 +136,7 @@
       (funcall !continuation! !level!) (undo-bindings))))
 
 (defun arg/3 (index term arg !level! !continuation!
-              &aux (!old-trail! *trail*))
+              &aux (!old-trail! (rt-trail-index *runtime-data*)))
   (incf !level!)
   (dereference term
     :if-variable  (error "ARG was given non-compound second argument ~A" term)
@@ -156,7 +156,7 @@
                                (undo-bindings)))))))
 
 (defun is/2 (x y !level! !continuation!
-             &aux (!old-trail! *trail*))
+             &aux (!old-trail! (rt-trail-index *runtime-data*)))
   (incf !level!)
   (labels ((evaluate (term)
              (if (dereference term)
@@ -177,25 +177,25 @@
         (undo-bindings)))))
 
 (defun =/2 (x y !level! !continuation!
-            &aux (!old-trail! *trail*))
+            &aux (!old-trail! (rt-trail-index *runtime-data*)))
   (incf !level!)
   (when (always-trails-unify x y !old-trail!)
     (funcall !continuation! !level!)
     (undo-bindings)))
 
-(defun \\=/2 (x y !level! !continuation! &aux (!old-trail! *trail*))
+(defun \\=/2 (x y !level! !continuation! &aux (!old-trail! (rt-trail-index *runtime-data*)))
   (incf !level!)
   (if (always-trails-unify x y !old-trail!)
       (undo-bindings)
       (funcall !continuation! !level!)))
 
-(defun unsafe-=/2 (x y !level! !continuation! &aux (!old-trail! *trail*))
+(defun unsafe-=/2 (x y !level! !continuation! &aux (!old-trail! (rt-trail-index *runtime-data*)))
   (incf !level!)
   (when (unsafe-always-trails-unify x y !old-trail!)
     (funcall !continuation! !level!)
     (undo-bindings)))
 
-(defun unsafe-\\=/2 (x y !level! !continuation! &aux (!old-trail! *trail*))
+(defun unsafe-\\=/2 (x y !level! !continuation! &aux (!old-trail! (rt-trail-index *runtime-data*)))
   (incf !level!)
   (if (unsafe-always-trails-unify x y !old-trail!)
       (undo-bindings)
@@ -405,12 +405,3 @@
 ;;;
 ;;; This was a Symbolics-only feature and will have to be re-implemented in a
 ;;; portable manner.
-
-(defun numbered-letter (n)
-  (case n
-    ( 1 "a") ( 2 "b") ( 3 "c") ( 4 "d") ( 5 "e")
-    ( 6 "f") ( 7 "g") ( 8 "h") ( 9 "i") (10 "j")
-    (11 "k") (12 "l") (13 "m") (14 "n") (15 "o")
-    (16 "p") (17 "q") (18 "r") (19 "s") (20 "t")
-    (21 "u") (22 "v") (23 "w") (24 "x") (25 "y")
-    (26 "z")))

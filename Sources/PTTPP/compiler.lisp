@@ -769,6 +769,8 @@
           (compile names defns)
           (compile namev defnv))
         (compile *name* defn)
+        ;; (format t "~&Storing definition in ~A." *name*)
+        (setf (get *name* 'procedure-definition) defn)
         (when *print-compile-names*
           (format t "~&~A compiled from LISP to machine code" *name*))
         (setf lisp-compile-time (- (get-internal-run-time) lisp-compile-time)))
@@ -1108,3 +1110,15 @@
         ((eq (car wff) 'true/0) nil)		;if wff is tautology 2005-07-21
 	(t (list wff))))
 
+;;; Cleaning up the global state
+
+(defun undefine-predicate (name)
+  (let ((functors (mapcar 'cdr (get name 'functors '()))))
+    (iter (for functor in functors)
+      (ignore-errors
+       (makunbound (symbolicate "*" functor "*"))
+       (makunbound (symbolicate "*~" functor "*"))
+       (setf (symbol-plist name) '())))))
+
+(defun undefine-predicates (&rest names)
+  (mapc 'undefine-predicate names))

@@ -19,7 +19,69 @@
   (chang&lee-example-8)
   (chang&lee-example-9))
 
-(defun chang&lee-example-1 nil
+(defun no-solution-1 ()
+  (print 'no-solution-1)
+  (format t "~&Run a false query.")
+  (program '()
+           '((f a b)
+             (<- (query) (f a c))))
+  (prog1
+      (let ((*single-solution* t))
+        (query))
+    (undefine-predicates 'f)))
+
+(defun no-solution-2 ()
+  (print 'no-solution-2)
+  (format t "~&Run a false query.")
+  (program '()
+           '((f a c)
+             (f b c)
+             (<- (query) (f a b))))
+  (prog1
+      (let ((*single-solution* t))
+        (query))
+    (undefine-predicates 'f)))
+
+(defun no-solution-3 ()
+  (print 'no-solution-3)
+  (format t "~&Run a query on a negated relation.")
+  (program '()
+           '((~some-pred a b)
+             (<- (query) (some-pred a b))))
+  (prog1
+      (let ((*single-solution* t))
+        (query))
+    (undefine-predicates 'some-pred)))
+
+(defun negation-0 ()
+  (print 'negation-0)
+  (format t "~&Run a query on a negated relation.")
+  (let ((*recompile* t))
+    (program '(x y)
+             '((~f a b)
+               (-> (~f x y) (f y x))
+               (-> (f x y) (~f x y))
+               (<- (query) (f b a)))))
+  (prog1
+      (let ((*single-solution* t))
+        (query))
+  (undefine-predicates 'f)))
+
+(defun negation-1 ()
+  (print 'negation-1)
+  (format t "~&Run a query on a negated relation.")
+  (let ((*recompile* t))
+    (program '(x y)
+             '((f a b)
+               (-> (~f x y) (~f y x))
+               (-> (f x y) (f y x))
+               (<- (query) (f b a)))))
+  (prog1
+      (let ((*single-solution* t))
+        (query))
+  (undefine-predicates 'f)))
+
+(defun chang&lee-example-1 ()
   (print 'chang&lee-example-1)
   (format t "~&Prove that in an associative system with left and right solutions,~%there is a right identity element.")
   (program '(u v w x y z)
@@ -29,9 +91,10 @@
 	     (-> (and (p x y u) (p y z v) (p u z w)) (p x v w))
 	     (<- (query) (and (search (p (k x) x (k x))) !)))
 	   :incomplete-inference t)
-  (query))
+  (query)
+  (undefine-predicates 'p 'g 'h 'k))
 
-(defun chang&lee-example-2 nil
+(defun chang&lee-example-2 ()
   (print 'chang&lee-example-2)
   (format t "~&In an associative system with an identity element, if the square~%of every element is the identity, the system~%is commutative.")
   (program '(u v w x y z)
@@ -43,9 +106,10 @@
 	     (-> (and (p x y u) (p y z v) (p u z w)) (p x v w))
 	     (<- (query) (and (search (p b a c)) !)))
 	   :incomplete-inference t)
-  (query))
+  (query)
+  (undefine-predicates 'p 'g 'h 'k))
 
-(defun chang&lee-example-3 nil
+(defun chang&lee-example-3 ()
   (print 'chang&lee-example-3)
   (format t "~&In a group the left identity element is also a right identity.")
   (program '(u v w x y z)
@@ -55,9 +119,10 @@
 	     (-> (and (p x y u) (p y z v) (p u z w)) (p x v w))
 	     (<- (query) (and (search (p a e a)) !)))
 	   :incomplete-inference t)
-  (query))
+  (query)
+  (undefine-predicates 'p 'g 'h 'k))
 
-(defun chang&lee-example-4 nil
+(defun chang&lee-example-4 ()
   (print 'chang&lee-example-4)
   (format t "~&In a group with left inverse and left identity every element~%has a right inverse.")
   (program '(u v w x y z)
@@ -67,9 +132,10 @@
 	     (-> (and (p x y u) (p y z v) (p u z w)) (p x v w))
 	     (<- (query) (and (search (p a x e)) !)))
 	   :incomplete-inference t)
-  (query))
+  (query)
+  (undefine-predicates 'p 'g 'h 'k))
 
-(defun chang&lee-example-5 nil
+(defun chang&lee-example-5 ()
   (print 'chang&lee-example-5)
   (format t "~&If S is a nonempty subset of a group such that if x,y belong to S,~%then x*y^-1 belongs to S, then the identity e belongs to S.")
   (program '(u v w x y z)
@@ -83,9 +149,10 @@
 	     (-> (and (p x y u) (p y z v) (p u z w)) (p x v w))
 	     (<- (query) (and (search (s e)) !)))
 	   :incomplete-inference t)
-  (query))
+  (query)
+  (undefine-predicates 'd 'i 'l 'p 'g 'h 'k 's))
 
-(defun chang&lee-example-6 nil
+(defun chang&lee-example-6 ()
   (print 'chang&lee-example-6)
   (format t "~&If S is a nonempty subset of a group such that if x,y belong to S,~%then x*y^-1 belongs to S, then S contains x^-1 whenever it contains x.")
   (program '(u v w x y z)
@@ -99,9 +166,10 @@
 	     (-> (and (p x y u) (p y z v) (p u z w)) (p x v w))
 	     (<- (query) (and (search (s (i a))) !)))
 	   :incomplete-inference t)
-  (query))
+  (query)
+  (undefine-predicates 'd 'i 'l 'p 'g 'h 'k 's))
 
-(defun chang&lee-example-7 nil
+(defun chang&lee-example-7 ()
   (print 'chang&lee-example-7)
   (format t "~&If a is a prime and a = b^2/c^2 then a divides b.")
   (program '(u x y z)
@@ -112,9 +180,10 @@
 	     (or (~m x y z) (d x z))
 	     (or (~p x) (~m y z u) (~d x u) (d x y) (d x z))
 	     (<- (query) (and (search (d a b)) !))))
-  (query))
+  (query)
+  (undefine-predicates 'd 'i 'l 'p 'g 'h 'k 's))
 
-(defun chang&lee-example-8 nil
+(defun chang&lee-example-8 ()
   (print 'chang&lee-example-8)
   (format t "~&Any number greater than 1 has a prime divisor.")
   (program '(x y z)
@@ -128,9 +197,10 @@
 	     (or (~l 1 x) (~l x a) (p (f x)))
 	     (or (~l 1 x) (~l x a) (d (f x) x))
 	     (<- (query) (and (search (and (p x) (d x a))) !))))
-  (query))
+  (query)
+  (undefine-predicates 'd 'i 'l 'p 'g 'h 'k 's))
 
-(defun chang&lee-example-9 nil
+(defun chang&lee-example-9 ()
   (print 'chang&lee-example-9)
   (format t "~&There exist infinitely many primes.")
   (program '(x y)
@@ -143,5 +213,6 @@
 	     (or (p x) (l (h x) x))
 	     (or (~p x) (~l a x) (l (f a) x))	; negation of theorem
 	     (<- (query) (and (search (and (p x) (l a x) (~l (f a) x))) !))))
-  (query))
+  (query)
+  (undefine-predicates 'd 'i 'l 'p 'g 'h 'k 's))
 

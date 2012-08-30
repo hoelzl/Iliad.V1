@@ -97,6 +97,10 @@
 ;;; This file is licensed under the MIT license; see the file LICENSE
 ;;; in the root directory for further information.
 
+(defun undefine-all-test-predicates ()
+  (undefine-predicates 'a 'b 'c 'd 'e 'f 'g 'h 'i 'j 'k 'l 'm
+                       'n 'o 'p 'q 'r 's 't 'u 'v 'w 'x 'y 'z
+                       'member))
 
 (in-package #:pttpp)
 (declaim (optimize (debug 3)))~3%")
@@ -104,16 +108,16 @@
 ) ;; eval-when
 
 (generate-integration-test simple-integration-test-01
-  (undefine-predicates 'd 'e 'f 'g 'h 'i 'k 'l 'p 's 'member)
+  (undefine-all-test-predicates)
   (program '()
 	   '((f a b)
 	     (<- (query) (f a b)))
 	   :traceable nil)
   (query)
-  (undefine-predicates 'd 'e 'f 'g 'h 'i 'k 'l 'p 's 'member))
+  (undefine-all-test-predicates))
 
 (generate-integration-test simple-integration-test-02
-  (undefine-predicates 'd 'e 'f 'g 'h 'i 'k 'l 'p 's 'member)
+  (undefine-all-test-predicates)
   (program '(x y)
 	   '((g a b)
 	     (<- (f x y) (g x y))
@@ -121,20 +125,20 @@
               (f x b)))
 	   :traceable nil)
   (query)
-  (undefine-predicates 'd 'e 'f 'g 'h 'i 'k 'l 'p 's 'member))
+  (undefine-all-test-predicates))
 
 (generate-integration-test simple-integration-test-03
-  (undefine-predicates 'd 'e 'f 'g 'h 'i 'k 'l 'p 's 'member)
+  (undefine-all-test-predicates)
   (program '(x y)
 	   '((f a b)
 	     (<- (query)
 	      (and
 	       (f x b)))))
   (query)
-  (undefine-predicates 'd 'e 'f 'g 'h 'i 'k 'l 'p 's 'member))
+  (undefine-all-test-predicates))
 
 (generate-integration-test simple-integration-test-04
-  (undefine-predicates 'd 'e 'f 'g 'h 'i 'k 'l 'p 's 'member)
+  (undefine-all-test-predicates)
   (program '(x y)
 	   '((g a b)
 	     (g c d)
@@ -149,10 +153,10 @@
 	       (f c y)
 	       (f x y)))))
   (query)
-  (undefine-predicates 'd 'e 'f 'g 'h 'i 'k 'l 'p 's 'member))
+  (undefine-all-test-predicates))
 
 (generate-integration-test simple-integration-test-04a
-  (undefine-predicates 'd 'e 'f 'g 'h 'i 'k 'l 'p 's 'member)
+  (undefine-all-test-predicates)
   (program '(x y)
 	   '((g a b)
 	     (g c d)
@@ -168,10 +172,10 @@
 	       (f x y))))
 	   :traceable nil)
   (query)
-  (undefine-predicates 'd 'e 'f 'g 'h 'i 'k 'l 'p 's 'member))
+  (undefine-all-test-predicates))
 
 (generate-integration-test simple-integration-test-04b
-  (undefine-predicates 'd 'e 'f 'g 'h 'i 'k 'l 'p 's 'member)
+  (undefine-all-test-predicates)
   (program '(x y)
 	   '((g a b)
 	     (g c d)
@@ -185,10 +189,10 @@
 	       (f c y)
 	       (f x y)))))
   (query)
-  (undefine-predicates 'd 'e 'f 'g 'h 'i 'k 'l 'p 's 'member))
+  (undefine-all-test-predicates))
 
 (generate-integration-test simple-integration-test-05
-  (undefine-predicates 'd 'e 'f 'g 'h 'i 'k 'l 'p 's 'member)
+  (undefine-all-test-predicates)
   (program '(x y)
 	   '((g a b)
 	     (g c d)
@@ -203,10 +207,10 @@
 	       (f c y)
 	       (f x y)))))
   (query)
-  (undefine-predicates 'd 'e 'f 'g 'h 'i 'k 'l 'p 's 'member))
+  (undefine-all-test-predicates))
 
 (generate-integration-test simple-integration-test-06
-  (undefine-predicates 'd 'e 'f 'g 'h 'i 'k 'l 'p 's 'member)
+  (undefine-all-test-predicates)
   (program '(x y zs)
 	   '((member x (cons x zs))
 	     (<- (member x (cons y zs))
@@ -214,10 +218,10 @@
 	     (<- (query)
 	      (member x (cons a (cons b (cons c nil)))))))
   (query)
-  (undefine-predicates 'd 'e 'f 'g 'h 'i 'k 'l 'p 's 'member))
+  (undefine-all-test-predicates))
 
 (generate-integration-test simple-integration-test-07
-  (undefine-predicates 'd 'e 'f 'g 'h 'i 'k 'l 'p 's 'member)
+  (undefine-all-test-predicates)
   (program '(x y zs)
 	   '((member x (cons x zs))
 	     (<- (member x (cons y zs))
@@ -226,11 +230,11 @@
 	      (search
 	       (member x (cons a (cons b (cons c nil))))))))
   (query)
-  (undefine-predicates 'd 'e 'f 'g 'h 'i 'k 'l 'p 's 'member))
+  (undefine-all-test-predicates))
 
 
 (generate-integration-test simple-integration-test-08
-  (undefine-predicates 'd 'e 'f 'g 'h 'i 'k 'l 'p 's 'member)
+  (undefine-all-test-predicates)
   (program '(x y zs)
 	   '((member x (cons x zs))
 	     (<- (member x (cons y zs))
@@ -239,10 +243,10 @@
 	      (search
 	       (member x (cons a (cons b (cons c nil))))))))
   (query)
-  (undefine-predicates 'd 'e 'f 'g 'h 'i 'k 'l 'p 's 'member))
+  (undefine-all-test-predicates))
 
 (generate-integration-test simple-integration-test-09
-  (undefine-predicates 'd 'e 'f 'g 'h 'i 'k 'l 'p 's 'member)
+  (undefine-all-test-predicates)
   (program '(x y zs)
 	   '((member x (cons x zs))
 	     (<- (member x (cons y zs))
@@ -251,10 +255,10 @@
 	      (search (member x y)
 	       5))))
   (query)
-  (undefine-predicates 'd 'e 'f 'g 'h 'i 'k 'l 'p 's 'member))
+  (undefine-all-test-predicates))
 
 (generate-integration-test simple-integration-test-09a
-  (undefine-predicates 'd 'e 'f 'g 'h 'i 'k 'l 'p 's 'member)
+  (undefine-all-test-predicates)
   (program '(x y zs)
 	   '((member x (cons x zs))
 	     (<- (member x (cons y zs))
@@ -264,10 +268,10 @@
 	       1000))))
   (let ((*print-trail* nil))
     (query))
-  (undefine-predicates 'd 'e 'f 'g 'h 'i 'k 'l 'p 's 'member))
+  (undefine-all-test-predicates))
 
 (generate-integration-test simple-integration-test-10
-  (undefine-predicates 'd 'e 'f 'g 'h 'i 'k 'l 'p 's 'member)
+  (undefine-all-test-predicates)
   (program '(x y zs)
 	   '((member x (cons x zs))
 	     (<- (member x (cons y zs))
@@ -275,11 +279,11 @@
 	     (<- (query)
 	      (member x (cons a (cons b (cons c nil)))))))
   (query)
-  (undefine-predicates 'd 'e 'f 'g 'h 'i 'k 'l 'p 's 'member))
+  (undefine-all-test-predicates))
 
 
 (generate-integration-test simple-integration-test-10a
-  (undefine-predicates 'd 'e 'f 'g 'h 'i 'k 'l 'p 's 'member)
+  (undefine-all-test-predicates)
   (program '(x y zs)
 	   '((member x (cons x zs))
 	     (<- (member x (cons y zs))
@@ -288,18 +292,18 @@
 	       (search
 		 (member x (cons a (cons b (cons c nil))))))))
   (query)
-  (undefine-predicates 'd 'e 'f 'g 'h 'i 'k 'l 'p 's 'member))
+  (undefine-all-test-predicates))
 
 (generate-integration-test simple-integration-test-11
-  (undefine-predicates 'd 'e 'f 'g 'h 'i 'k 'l 'p 's 'member)
-  (program '(x y zs)
+  (undefine-all-test-predicates)
+  (program '(x y)
 	   '((<- (query)
 	      (and (= x a) (\\= x b)))))
   (query)
-  (undefine-predicates 'd 'e 'f 'g 'h 'i 'k 'l 'p 's 'member))
+  (undefine-all-test-predicates))
 	   
 (generate-integration-test simple-integration-test-12
-  (undefine-predicates 'd 'e 'f 'g 'h 'i 'k 'l 'p 's 'member)
+  (undefine-all-test-predicates)
   (program '(x y z)
 	   '((<- (f x y) (~g x y))
 	     (<- (g x y) (~f x y))
@@ -307,10 +311,10 @@
 	     (g a b)
 	     (<- (query) (f x y))))
   (query)
-  (undefine-predicates 'd 'e 'f 'g 'h 'i 'k 'l 'p 's 'member))
+  (undefine-all-test-predicates))
 
 (generate-integration-test simple-integration-test-13
-  (undefine-predicates 'd 'e 'f 'g 'h 'i 'k 'l 'p 's 'member)
+  (undefine-all-test-predicates)
   (program '(x y z)
 	   '((<- (f x y) (~g x y))
              (<- (g x y) (~f x y))
@@ -319,63 +323,63 @@
 	     (<- (query) (f x y)))
 	   :traceable nil)
   (query)
-  (undefine-predicates 'd 'e 'f 'g 'h 'i 'k 'l 'p 's 'member))
+  (undefine-all-test-predicates))
 
 (generate-integration-test simple-integration-test-14
-  (undefine-predicates 'd 'e 'f 'g 'h 'i 'k 'l 'p 's 'member)
+  (undefine-all-test-predicates)
   (program '(x y z)
 	   '((<- (f x y) (~g x y))
 	     (<- (g x y) (~f x y) )
 	     (<- (~g x y) (and (\\= x y) (g y x)))
-	     (<- (or (= x y) (~g y x)) (g x y))
+	     ;; (<- (= x y) (and (g x y) (g y x)))
 	     (g a b)
 	     (<- (query) (f x y)))
 	   :traceable nil)
   (query)
-  (undefine-predicates 'd 'e 'f 'g 'h 'i 'k 'l 'p 's 'member))
+  (undefine-all-test-predicates))
 
 (generate-integration-test simple-integration-test-14a
-  (undefine-predicates 'd 'e 'f 'g 'h 'i 'k 'l 'p 's 'member)
+  (undefine-all-test-predicates)
   (program '(x y z)
 	   '((<- (f x y) (~g x y))
 	     (<- (g x y) (~f x y))
 	     (<- (~g x y) (and (\\= x y) (g y x)))
-	     (<- (or (= x y) (~g y x)) (g x y))
+	     ;; (<- (= x y) (and (g x y) (g y x)))
 	     (g a b)
 	     (<- (query) (~g x y)))
 	   :traceable nil)
   (query)
-  (undefine-predicates 'd 'e 'f 'g 'h 'i 'k 'l 'p 's 'member))
+  (undefine-all-test-predicates))
 
 (generate-integration-test simple-integration-test-14b
-  (undefine-predicates 'd 'e 'f 'g 'h 'i 'k 'l 'p 's 'member)
+  (undefine-all-test-predicates)
   (program '(x y z)
 	   '((<- (f x y) (~g x y))
              ;; (<- (g x y) (~f x y))
 	     (<- (~g x y) (and (g y x) (\\= x y)))
-	     (<- (or (g y x) (= x y)) (g x y))
+	     ;; (<- (= x y) (and (g x y) (g y x)))
 	     (g a b)
 	     (<- (query) (f x y)))
 	   :traceable nil)
   (query)
-  (undefine-predicates 'd 'e 'f 'g 'h 'i 'k 'l 'p 's 'member))
+  (undefine-all-test-predicates))
 
 (generate-integration-test simple-integration-test-14c
-  (undefine-predicates 'd 'e 'f 'g 'h 'i 'k 'l 'p 's 'member)
+  (undefine-all-test-predicates)
   (program '(x y z)
 	   '((<- (f x y) (~g x y))
 	     ;; (<- (g x y) (~f x y))
 	     (<- (g x y) (and (~g y x) (\\= x y)))
-	     (<- (or (g y x) (= x y)) (~g x y))
+	     ;; (<- (= x y) (and (g x y) (g y x)))
 	     (g a b)
 	     (<- (query) (f x y)))
 	   :traceable nil)
   (query)
-  (undefine-predicates 'd 'e 'f 'g 'h 'i 'k 'l 'p 's 'member))
+  (undefine-all-test-predicates))
 
 
 (generate-integration-test chang&lee-test-1
-  (undefine-predicates 'd 'e 'f 'g 'h 'i 'k 'l 'p 's 'member)
+  (undefine-all-test-predicates)
   (program '(u v w x y z)
 	   '((p (g x y) x y)
 	     (p x (h x y) y)
@@ -384,10 +388,10 @@
 	     (<- (query) (and (search (p (k x) x (k x))) !)))
 	   :incomplete-inference t)
   (query)
-  (undefine-predicates 'd 'e 'f 'g 'h 'i 'k 'l 'p 's 'member))
+  (undefine-all-test-predicates))
 
 (generate-integration-test chang&lee-test-2
-  (undefine-predicates 'd 'e 'f 'g 'h 'i 'k 'l 'p 's 'member)
+  (undefine-all-test-predicates)
   (program '(u v w x y z)
 	   '((p e x x)
 	     (p x e x)
@@ -398,10 +402,10 @@
 	     (<- (query) (and (search (p b a c)) !)))
 	   :incomplete-inference t)
   (query)
-  (undefine-predicates 'd 'e 'f 'g 'h 'i 'k 'l 'p 's 'member))
+  (undefine-all-test-predicates))
 
 (generate-integration-test chang&lee-test-3
-  (undefine-predicates 'd 'e 'f 'g 'h 'i 'k 'l 'p 's 'member)
+  (undefine-all-test-predicates)
   (program '(u v w x y z)
 	   '((p e x x)
 	     (p (i x) x e)
@@ -410,10 +414,10 @@
 	     (<- (query) (and (search (p a e a)) !)))
 	   :incomplete-inference t)
   (query)
-  (undefine-predicates 'd 'e 'f 'g 'h 'i 'k 'l 'p 's 'member))
+  (undefine-all-test-predicates))
 
 (generate-integration-test chang&lee-test-4
-  (undefine-predicates 'd 'e 'f 'g 'h 'i 'k 'l 'p 's 'member)
+  (undefine-all-test-predicates)
   (program '(u v w x y z)
 	   '((p e x x)
 	     (p (i x) x e)
@@ -422,10 +426,10 @@
 	     (<- (query) (and (search (p a x e)) !)))
 	   :incomplete-inference t)
   (query)
-  (undefine-predicates 'd 'e 'f 'g 'h 'i 'k 'l 'p 's 'member))
+  (undefine-all-test-predicates))
 
 (generate-integration-test chang&lee-test-5
-  (undefine-predicates 'd 'e 'f 'g 'h 'i 'k 'l 'p 's 'member)
+  (undefine-all-test-predicates)
   (program '(u v w x y z)
 	   '((p e x x)
 	     (p x e x)
@@ -438,10 +442,10 @@
 	     (<- (query) (and (search (s e)) !)))
 	   :incomplete-inference t)
   (query)
-  (undefine-predicates 'd 'e 'f 'g 'h 'i 'k 'l 'p 's 'member))
+  (undefine-all-test-predicates))
 
 (generate-integration-test chang&lee-test-6
-  (undefine-predicates 'd 'e 'f 'g 'h 'i 'k 'l 'p 's 'member)
+  (undefine-all-test-predicates)
   (program '(u v w x y z)
 	   '((p e x x)
 	     (p x e x)
@@ -454,10 +458,10 @@
 	     (<- (query) (and (search (s (i a))) !)))
 	   :incomplete-inference t)
   (query)
-  (undefine-predicates 'd 'e 'f 'g 'h 'i 'k 'l 'p 's 'member))
+  (undefine-all-test-predicates))
 
 (generate-integration-test chang&lee-test-7
-  (undefine-predicates 'd 'e 'f 'g 'h 'i 'k 'l 'p 's 'member)
+  (undefine-all-test-predicates)
   (program '(u x y z)
 	   '((p a)
 	     (m a (s c) (s b))
@@ -467,10 +471,10 @@
 	     (or (~p x) (~m y z u) (~d x u) (d x y) (d x z))
 	     (<- (query) (and (search (d a b)) !))))
   (query)
-  (undefine-predicates 'd 'e 'f 'g 'h 'i 'k 'l 'p 's 'member))
+  (undefine-all-test-predicates))
 
 (generate-integration-test chang&lee-test-8
-  (undefine-predicates 'd 'e 'f 'g 'h 'i 'k 'l 'p 's 'member)
+  (undefine-all-test-predicates)
   (program '(x y z)
 	   '((l 1 a)
 	     (d x x)
@@ -483,10 +487,10 @@
 	     (or (~l 1 x) (~l x a) (d (f x) x))
 	     (<- (query) (and (search (and (p x) (d x a))) !))))
   (query)
-  (undefine-predicates 'd 'e 'f 'g 'h 'i 'k 'l 'p 's 'member))
+  (undefine-all-test-predicates))
 
 (generate-integration-test chang&lee-test-9
-  (undefine-predicates 'd 'e 'f 'g 'h 'i 'k 'l 'p 's 'member)
+  (undefine-all-test-predicates)
   (program '(x y)
 	   '((l x (f x))
 	     (~l x x)
@@ -498,4 +502,4 @@
 	     (or (~p x) (~l a x) (l (f a) x))	; negation of theorem
 	     (<- (query) (and (search (and (p x) (l a x) (~l (f a) x))) !))))
   (query)
-  (undefine-predicates 'd 'e 'f 'g 'h 'i 'k 'l 'p 's 'member))
+  (undefine-all-test-predicates))

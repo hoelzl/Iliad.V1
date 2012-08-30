@@ -9,14 +9,13 @@
 ;;; This file is licensed under the MIT license; see the file LICENSE
 ;;; in the root directory for further information.
 
+(in-package #:pttpp)
+(declaim (optimize (debug 3)))
+
 (defun undefine-all-test-predicates ()
   (undefine-predicates 'a 'b 'c 'd 'e 'f 'g 'h 'i 'j 'k 'l 'm
                        'n 'o 'p 'q 'r 's 't 'u 'v 'w 'x 'y 'z
                        'member))
-
-(in-package #:pttpp)
-(declaim (optimize (debug 3)))
-
 
 #+5AM
 (define-integration-test simple-integration-test-01
@@ -366,6 +365,165 @@
     (it.bese.fiveam:is (equalp 'a (variable-value var-1)))
     (it.bese.fiveam:is (= '1 (variable-level var-2)))
     (it.bese.fiveam:is (eql 'x (variable-name var-2)))
+    (it.bese.fiveam:is (equalp 'b (variable-value var-2)))))
+
+#+5AM
+(define-integration-test simple-integration-test-15
+  (undefine-all-test-predicates)
+  (program 'nil '((f a b) (<- (query) (f a c))))
+  (query)
+  (undefine-all-test-predicates)
+  (let* ()
+    (it.bese.fiveam:is (= -1 (rt-trail-index *runtime-data*)))))
+
+#+5AM
+(define-integration-test simple-integration-test-16
+  (undefine-all-test-predicates)
+  (program 'nil '((f a c) (f b c) (<- (query) (f a b))))
+  (query)
+  (undefine-all-test-predicates)
+  (let* ()
+    (it.bese.fiveam:is (= -1 (rt-trail-index *runtime-data*)))))
+
+#+5AM
+(define-integration-test simple-integration-test-17
+  (undefine-all-test-predicates)
+  (program '(x)
+           '((~some-pred a b) (some-pred (f x) (g x))
+             (<- (query) (some-pred a b))))
+  (query)
+  (undefine-all-test-predicates)
+  (let* ()
+    (it.bese.fiveam:is (= -1 (rt-trail-index *runtime-data*)))))
+
+#+5AM
+(define-integration-test simple-integration-test-18
+  (undefine-all-test-predicates)
+  (program '(x y)
+           '((~f a b) (-> (~f x y) (f y x)) (-> (f x y) (~f x y))
+             (<- (query) (f x y))))
+  (query)
+  (undefine-all-test-predicates)
+  (let* ((var-1 (aref (rt-trail-array *runtime-data*) 0))
+         (var-2 (variable-value var-1)))
+    (it.bese.fiveam:is (= 0 (rt-trail-index *runtime-data*)))
+    (it.bese.fiveam:is (= '1 (variable-level var-1)))
+    (it.bese.fiveam:is (eql 'y (variable-name var-1)))
+    (it.bese.fiveam:is
+     (equalp '#S(logic-variable :level 1 :value nil :name x)
+             (variable-value var-1)))
+    (it.bese.fiveam:is (= '1 (variable-level var-2)))
+    (it.bese.fiveam:is (eql 'x (variable-name var-2)))
+    (it.bese.fiveam:is (equalp 'nil (variable-value var-2)))))
+
+#+5AM
+(define-integration-test simple-integration-test-19
+  (undefine-all-test-predicates)
+  (program '(x y)
+           '((f a b) (-> (~f x y) (~f y x)) (-> (f x y) (f y x))
+             (<- (query) (f x y))))
+  (query)
+  (undefine-all-test-predicates)
+  (let* ((var-1 (aref (rt-trail-array *runtime-data*) 0))
+         (var-2 (aref (rt-trail-array *runtime-data*) 1)))
+    (it.bese.fiveam:is (= 1 (rt-trail-index *runtime-data*)))
+    (it.bese.fiveam:is (= '1 (variable-level var-1)))
+    (it.bese.fiveam:is (eql 'x (variable-name var-1)))
+    (it.bese.fiveam:is (equalp 'a (variable-value var-1)))
+    (it.bese.fiveam:is (= '1 (variable-level var-2)))
+    (it.bese.fiveam:is (eql 'y (variable-name var-2)))
+    (it.bese.fiveam:is (equalp 'b (variable-value var-2)))))
+
+#+5AM
+(define-integration-test simple-integration-test-20
+  (undefine-all-test-predicates)
+  (program '(x y)
+           '((~f a b) (-> (~f x y) (~f y x)) (-> (f x y) (f y x))
+             (<- (query) (~f x y))))
+  (query)
+  (undefine-all-test-predicates)
+  (let* ((var-1 (aref (rt-trail-array *runtime-data*) 0))
+         (var-2 (aref (rt-trail-array *runtime-data*) 1)))
+    (it.bese.fiveam:is (= 1 (rt-trail-index *runtime-data*)))
+    (it.bese.fiveam:is (= '1 (variable-level var-1)))
+    (it.bese.fiveam:is (eql 'x (variable-name var-1)))
+    (it.bese.fiveam:is (equalp 'a (variable-value var-1)))
+    (it.bese.fiveam:is (= '1 (variable-level var-2)))
+    (it.bese.fiveam:is (eql 'y (variable-name var-2)))
+    (it.bese.fiveam:is (equalp 'b (variable-value var-2)))))
+
+#+5AM
+(define-integration-test simple-integration-test-21
+  (undefine-all-test-predicates)
+  (program '(x y) '((f a b) (-> (f x y) (~f y x)) (<- (query) (~f x y))))
+  (query)
+  (undefine-all-test-predicates)
+  (let* ((var-1 (aref (rt-trail-array *runtime-data*) 0))
+         (var-2 (variable-value var-1)))
+    (it.bese.fiveam:is (= 0 (rt-trail-index *runtime-data*)))
+    (it.bese.fiveam:is (= '1 (variable-level var-1)))
+    (it.bese.fiveam:is (eql 'y (variable-name var-1)))
+    (it.bese.fiveam:is
+     (equalp '#S(logic-variable :level 1 :value nil :name x)
+             (variable-value var-1)))
+    (it.bese.fiveam:is (= '1 (variable-level var-2)))
+    (it.bese.fiveam:is (eql 'x (variable-name var-2)))
+    (it.bese.fiveam:is (equalp 'nil (variable-value var-2)))))
+
+#+5AM
+(define-integration-test simple-integration-test-22
+  (undefine-all-test-predicates)
+  (program '(x y)
+           '((f a b) (-> (f x y) (~f y x)) (-> (~f x y) (f y x))
+             (<- (query) (~f x y))))
+  (query)
+  (undefine-all-test-predicates)
+  (let* ((var-1 (aref (rt-trail-array *runtime-data*) 0))
+         (var-2 (variable-value var-1)))
+    (it.bese.fiveam:is (= 0 (rt-trail-index *runtime-data*)))
+    (it.bese.fiveam:is (= '1 (variable-level var-1)))
+    (it.bese.fiveam:is (eql 'y (variable-name var-1)))
+    (it.bese.fiveam:is
+     (equalp '#S(logic-variable :level 1 :value nil :name x)
+             (variable-value var-1)))
+    (it.bese.fiveam:is (= '1 (variable-level var-2)))
+    (it.bese.fiveam:is (eql 'x (variable-name var-2)))
+    (it.bese.fiveam:is (equalp 'nil (variable-value var-2)))))
+
+#+5AM
+(define-integration-test simple-integration-test-23
+  (undefine-all-test-predicates)
+  (program '(x y)
+           '((f a b) (-> (f x y) (~f y x)) (-> (~f x y) (f y x))
+             (<- (query) (f x y))))
+  (query)
+  (undefine-all-test-predicates)
+  (let* ((var-1 (aref (rt-trail-array *runtime-data*) 0))
+         (var-2 (aref (rt-trail-array *runtime-data*) 1)))
+    (it.bese.fiveam:is (= 1 (rt-trail-index *runtime-data*)))
+    (it.bese.fiveam:is (= '1 (variable-level var-1)))
+    (it.bese.fiveam:is (eql 'x (variable-name var-1)))
+    (it.bese.fiveam:is (equalp 'a (variable-value var-1)))
+    (it.bese.fiveam:is (= '1 (variable-level var-2)))
+    (it.bese.fiveam:is (eql 'y (variable-name var-2)))
+    (it.bese.fiveam:is (equalp 'b (variable-value var-2)))))
+
+#+5AM
+(define-integration-test simple-integration-test-24
+  (undefine-all-test-predicates)
+  (program '(x y)
+           '((f a b) (-> (f x y) (~f y x)) (-> (~f x y) (f y x))
+             (<- (query) (f x y))))
+  (query)
+  (undefine-all-test-predicates)
+  (let* ((var-1 (aref (rt-trail-array *runtime-data*) 0))
+         (var-2 (aref (rt-trail-array *runtime-data*) 1)))
+    (it.bese.fiveam:is (= 1 (rt-trail-index *runtime-data*)))
+    (it.bese.fiveam:is (= '1 (variable-level var-1)))
+    (it.bese.fiveam:is (eql 'x (variable-name var-1)))
+    (it.bese.fiveam:is (equalp 'a (variable-value var-1)))
+    (it.bese.fiveam:is (= '1 (variable-level var-2)))
+    (it.bese.fiveam:is (eql 'y (variable-name var-2)))
     (it.bese.fiveam:is (equalp 'b (variable-value var-2)))))
 
 #+5AM

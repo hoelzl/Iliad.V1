@@ -10,8 +10,8 @@
 ;;; =====================
 
 (in-package #:pttpp)
-;; (declaim (optimize (debug 3)))
-;; (declaim (optimize (speed 2) (compilation-speed 0)))
+;;(declaim (optimize (debug 3)))
+(declaim (optimize (speed 2) (compilation-speed 0)))
 
 #+5am
 (5am:in-suite pttpp-compiler-suite)
@@ -133,9 +133,12 @@
                (l2 (clause-body-length (caddr body) fl)))
 	   (if (= l1 l2)
 	       l1
-	       (error
-                "OR branches ~A and ~A not of same length.~%Proof printing won't work."
-                (cadr body) (caddr body)))))
+               (progn
+                 #+(or)
+                 (error
+                  "OR branches ~A and ~A not of same length.~%Proof printing won't work."
+                  (cadr body) (caddr body))
+                 1))))
 	((member (car body) '(search/1 search/2 search/3 search/4))
          (clause-body-length (cadr body) fl))
 	((invisible-functor-p (car body)) 0)
@@ -863,18 +866,36 @@
 
 (defvar *print-proof-time* 0)
 
+;;; FIXME: This is an evil hack.  Replace with proper printing of the trail.
+(defun print-trail ()
+  (let ((result (make-array (length (rt-trail-array *runtime-data*))
+                            :fill-pointer (1+ (rt-trail-index *runtime-data*))
+                            :initial-contents (rt-trail-array *runtime-data*))))
+    (labels ((walk (node)
+               (dereference node
+                 :if-compound
+                 (progn
+                   ;; (format t "~&Node = ~A" node)
+                   (dotimes (j (length node))
+                     (walk (nth j node))
+                     (dereference (nth j node)))))))
+      (dotimes (i (length result))
+        (dereference (aref result i)
+          :if-compound (walk (aref result i))))
+      (format t "~&Success:  trail = ~A,~%~4Ttrail-array = ~W.~%"
+              (rt-trail-index *runtime-data*) result))))
+
 (defun query-success (!level!)
   (declare (ignore !level!))
-  (let ((*print-readably* t)
+  (let (#+(or)
+        (*print-readably* t)
+        #+(or)
 	(*print-circle* t))
     (when *print-success-notification*
       (if *print-trail*
-	  (format t "~&Success:  trail = ~A,~%~4Ttrail-array = ~W.~%"
-		  (rt-trail-index *runtime-data*)
-                  (make-array `(,(1+ (rt-trail-index *runtime-data*)))
-                              :displaced-to (rt-trail-array *runtime-data*)))
-	  (format t "~&Success."))))
-    (incf *number-of-solutions-found*)
+          (print-trail)
+          (format t "~&Success."))))
+  (incf *number-of-solutions-found*)
   (if *single-solution*
       (throw 'query t)
       nil))
@@ -1113,12 +1134,41 @@
 ;;; Cleaning up the global state
 
 (defun undefine-predicate (name)
-  (let ((functors (mapcar 'cdr (get name 'functors '()))))
-    (iter (for functor in functors)
-      (ignore-errors
-       (makunbound (symbolicate "*" functor "*"))
-       (makunbound (symbolicate "*~" functor "*"))
-       (setf (symbol-plist name) '())))))
+  (flet ((undefine (functors)
+           (when functors
+             ;; (format *error-output* "~&Undefining ~A." functors)
+             (iter (for functor in functors)
+               (ignore-errors
+                (makunbound (symbolicate "*" functor "*"))
+                (remprop functor 'compiled-parameters)
+                (remprop functor 'compiled-clauses)
+                (remprop functor 'procedure-definition)
+                (remprop functor 'ancestors))))))
+    (let* ((functors (mapcar 'cdr (get name 'functors '())))
+           (negated-functors (mapcar 'negated-functor functors)))
+      (undefine functors)
+      (undefine negated-functors))))
 
 (defun undefine-predicates (&rest names)
   (mapc 'undefine-predicate names))
+
+;;; Support for tests.
+
+;;; This should go into the utilities package, but then we have to
+;;; qualify all special variables with an explicit package prefix.
+
+#+5am
+(defmacro define-integration-test (name &body body)
+  `(5am:test (,name :suite pttpp-integration-suite :compile-at :definition-time)
+     (let ((*print-compile-names* nil)
+           (*print-compile-times* nil)
+           (*print-execution-time* nil)
+           (*print-clauses* nil)
+           (*traceable* nil)
+           (*trace-search* nil)
+           (*print-proof* nil)
+           (*print-trail* nil)
+           (*print-success-notification* nil)
+           (*single-solution* t))
+       ,@body)))
+

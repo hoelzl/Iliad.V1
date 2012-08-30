@@ -10,9 +10,13 @@
   :depends-on (#:alexandria
 	       #:fiveam
                #:iterate)
-  :components ((:file "package")
+  :components ((:file "packages")
 	       (:file "bootstrap")
 	       (:file "utilities")
+	       (:file "new-runtime")
                (:file "runtime")
+	       (:file "syntax-bootstrap")
+	       (:file "syntax")
                (:file "compiler")
-               (:file "builtins")))
+               (:file "builtins")
+	       (:file "golog")))

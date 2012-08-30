@@ -155,6 +155,40 @@
                                (funcall !continuation! !level!)
                                (undo-bindings)))))))
 
+;;; TODO: This implementation is completely untested (and possibly wrong). --tc
+(defun =../2 (term list !level! !continuation!)
+  (let ((!old-trail! (rt-trail-index *runtime-data*)))
+    (incf !level!)
+    (dereference term
+      :if-variable (error "Not implemented yet.")
+      :if-constant
+      (dereference list
+        :if-variable (when (always-trails-unify list term !old-trail!)
+                       (funcall !continuation! !level!)
+                       (undo-bindings))
+        :if-constant (when (always-trails-unify list term !old-trail!)
+                       (funcall !continuation! !level!)
+                       (undo-bindings))
+        :if-compound nil)
+      :if-compound
+      (dereference list
+        :if-variable (when (always-trails-unify list term !old-trail!)
+                       (funcall !continuation! !level!)
+                       (undo-bindings))
+        :if-constant nil
+        :if-compound (cond 
+                       ((eql (car list) 'cons/2)
+                        (when (and (always-trails-unify (second list) (first term) !old-trail!)
+                                   (always-trails-unify (third list) (rest term) !old-trail!))
+                          (funcall !continuation! !level!)
+                          (undo-bindings)))
+                       (t
+                        (when (always-trails-unify list term !old-trail!)
+                          (funcall !continuation! !level!)
+                          (undo-bindings))))))))
+                         
+                     
+
 (defun is/2 (x y !level! !continuation!
              &aux (!old-trail! (rt-trail-index *runtime-data*)))
   (incf !level!)

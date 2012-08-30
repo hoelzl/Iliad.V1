@@ -23,7 +23,7 @@
 
 
 (defstruct (runtime-data (:conc-name rt-))
-  (trail-array (make-array 10000) :type simple-vector)
+  (trail-array (make-array 100000) :type simple-vector)
   (trail-index -1 :type fixnum))
 
 

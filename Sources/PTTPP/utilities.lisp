@@ -5,7 +5,7 @@
 ;;; This file is licensed under the MIT license; see the file LICENSE
 ;;; in the root directory for further information.
 
-(in-package #:pttpp)
+(in-package #:pttpp-utilities)
 
 ;;; General utilities
 ;;; =================
@@ -14,6 +14,20 @@
   `(#+sbcl sb-ext:defglobal
     #-sbcl defvar
     ,name ,value ,@(if doc (list doc) ())))
+
+#-sbcl
+(deftype positive-fixnum ()
+  '(and (integer 0) fixnum))
+
+(defmacro gethash* (key hash-table default-value)
+  (once-only (key hash-table)
+    `(multiple-value-bind (value key-present-p)
+	 (gethash ,key ,hash-table nil)
+       (if (not key-present-p)
+	   (let ((default ,default-value))
+	     (setf (gethash ,key ,hash-table) default)
+	     (values default nil))
+	   (values value t)))))
 
 
 ;;; Numbering WFFs
@@ -28,6 +42,7 @@
     (21 "u") (22 "v") (23 "w") (24 "x") (25 "y")
     (26 "z")))
 
+
 ;;; Testing
 ;;; =======
 
@@ -41,6 +56,11 @@
   :description "Tests for the PTTPP runtime.")
 
 #+5am
+(5am:def-suite pttpp-syntax-suite
+  :in pttpp-suite
+  :description "Tests for the PTTPP syntax representation.")
+
+#+5am
 (5am:def-suite pttpp-compiler-suite
   :in pttpp-suite
   :description "Tests for the PTTPP compiler.")
@@ -51,22 +71,12 @@
   :description "Tests for the PTTPP built-in Prolog predicates.")
 
 #+5am
+(5am:def-suite pttpp-golog-suite
+  :in pttpp-suite
+  :description "Tests for the PTTPP golog implementation.")
+
+#+5am
 (5am:def-suite pttpp-integration-suite
   :in pttpp-suite
   :description "Integration tests for the PTTPP compiler.")
-
-#+5am
-(defmacro define-integration-test (name &body body)
-  `(5am:test (,name :suite pttpp-integration-suite :compile-at :definition-time)
-     (let ((*print-compile-names* nil)
-           (*print-compile-times* nil)
-           (*print-execution-time* nil)
-           (*print-clauses* nil)
-           (*traceable* nil)
-           (*trace-search* nil)
-           (*print-proof* nil)
-           (*print-trail* nil)
-           (*print-success-notification* nil)
-           (*single-solution* t))
-       ,@body)))
 

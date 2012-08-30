@@ -12,6 +12,12 @@
 (eval-when (:compile-toplevel :load-toplevel :execute)
 (defvar *integration-test-generators* '())
 
+(when (not (fboundp 'undefine-all-test-predicates))
+  (defun undefine-all-test-predicates ()
+    (undefine-predicates 'a 'b 'c 'd 'e 'f 'g 'h 'i 'j 'k 'l 'm
+                         'n 'o 'p 'q 'r 's 't 'u 'v 'w 'x 'y 'z
+                         'member)))
+
 (defmacro generate-integration-test (name &body body)
   (let ((generator-name (let ((*print-case* :upcase))
                           (intern (format nil "~A-GENERATOR" name)))))
@@ -97,13 +103,15 @@
 ;;; This file is licensed under the MIT license; see the file LICENSE
 ;;; in the root directory for further information.
 
+(in-package #:pttpp)
+(declaim (optimize (debug 3)))
+
 (defun undefine-all-test-predicates ()
   (undefine-predicates 'a 'b 'c 'd 'e 'f 'g 'h 'i 'j 'k 'l 'm
                        'n 'o 'p 'q 'r 's 't 'u 'v 'w 'x 'y 'z
                        'member))
 
-(in-package #:pttpp)
-(declaim (optimize (debug 3)))~3%")
+")
     (run-all-generators stream)))
 ) ;; eval-when
 
@@ -377,6 +385,90 @@
   (query)
   (undefine-all-test-predicates))
 
+(generate-integration-test simple-integration-test-15
+  (undefine-all-test-predicates)
+  (program '()
+           '((f a b)
+             (<- (query) (f a c))))
+  (query)
+  (undefine-all-test-predicates))
+
+(generate-integration-test simple-integration-test-16
+  (undefine-all-test-predicates)
+  (program '()
+           '((f a c)
+             (f b c)
+             (<- (query) (f a b))))
+  (query)
+  (undefine-all-test-predicates))
+
+(generate-integration-test simple-integration-test-17
+  (undefine-all-test-predicates)
+  (program '(x)
+           '((~some-pred a b)
+             (some-pred (f x) (g x))
+             (<- (query) (some-pred a b))))
+  (query)
+  (undefine-all-test-predicates))
+
+(generate-integration-test simple-integration-test-18
+  (undefine-all-test-predicates)
+  (program '(x y)
+           '((~f a b)
+             (-> (~f x y) (f y x))
+             (-> (f x y) (~f x y))
+             (<- (query) (f x y))))
+  (query)
+  (undefine-all-test-predicates))
+
+(generate-integration-test simple-integration-test-19
+  (undefine-all-test-predicates)
+  (program '(x y)
+           '((f a b)
+             (-> (~f x y) (~f y x))
+             (-> (f x y) (f y x))
+             (<- (query) (f x y))))
+  (query)
+  (undefine-all-test-predicates))
+
+(generate-integration-test simple-integration-test-20
+  (undefine-all-test-predicates)
+  (program '(x y)
+           '((~f a b)
+             (-> (~f x y) (~f y x))
+             (-> (f x y) (f y x))
+             (<- (query) (~f x y))))
+  (query)
+  (undefine-all-test-predicates))
+
+(generate-integration-test simple-integration-test-21
+  (undefine-all-test-predicates)
+  (program '(x y)
+           '((f a b)
+             (-> (f x y) (~f y x))
+             (<- (query) (~f x y))))
+  (query)
+  (undefine-all-test-predicates))
+
+(generate-integration-test simple-integration-test-22
+  (undefine-all-test-predicates)
+  (program '(x y)
+           '((f a b)
+             (-> (f x y) (~f y x))
+             (-> (~f x y) (f y x))
+             (<- (query) (~f x y))))
+  (query)
+  (undefine-all-test-predicates))
+
+(generate-integration-test simple-integration-test-23
+  (undefine-all-test-predicates)
+  (program '(x y)
+           '((f a b)
+             (-> (f x y) (~f y x))
+             (-> (~f x y) (f y x))
+             (<- (query) (f x y))))
+  (query)
+  (undefine-all-test-predicates))
 
 (generate-integration-test chang&lee-test-1
   (undefine-all-test-predicates)

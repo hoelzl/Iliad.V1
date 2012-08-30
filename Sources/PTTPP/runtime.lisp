@@ -11,7 +11,7 @@
 
 (in-package #:pttpp)
 ;; (declaim (optimize (debug 3)))
-;; (declaim (optimize (speed 2) (compilation-speed 0)))
+(declaim (optimize (speed 2) (compilation-speed 0)))
 
 #+5am
 (5am:in-suite pttpp-runtime-suite)
@@ -62,20 +62,6 @@
 ;;; Print execution time
 (defvar *print-execution-time* t)
 
-
-(defstruct (logic-variable (:conc-name variable-)
-                           (:constructor)
-                           (:constructor new-variable (name level))
-                           (:predicate variable-p))
-  "Runtime representation of logic variables."
-  (level 0 :type fixnum)
-  value
-  name)
-
-(defmethod make-load-form ((var logic-variable) &optional environment)
-  (make-load-form-saving-slots var
-                               :slot-names '(level value name)
-                               :environment environment))
 
 (defmacro dereference (x &key (if-constant t)
                               (if-variable nil)

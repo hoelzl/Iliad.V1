@@ -11,5 +11,4 @@
 	       #:fiveam
                #:iterate
 	       #:pttpp)
-  :components ((:file "package")
-	       (:file "integration-tests")))
+  :components ((:file "integration-tests")))

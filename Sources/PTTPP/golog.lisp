@@ -1,0 +1,220 @@
+;;; -*- Mode: Lisp; Syntax: Common-Lisp; Package: PTTPP; Base: 10; common-lisp-style: poem -*-
+
+;;; Copyright (c) 1986 Mark E. Stickel, SRI International, Menlo Park, CA 94025 USA
+;;; Copyright (c) 2012 Matthias Hölzl
+;;;
+;;; This file is licensed under the MIT license; see the file LICENSE
+;;; in the root directory for further information.
+
+;;; Golog in PTTPP.
+;;; ==============
+
+(in-package #:pttpp)
+
+#+5am
+(5am:in-suite pttpp-golog-suite)
+
+(defun define-golog-operators ()
+  (program '()
+	   '((op 800 xfx &)
+	     (op 850 xfy v)
+	     (op 870 xfy =>)
+	     (op 880 xfy <=>)
+	     (op 950 xfy |:|) ; use SEQ instead
+	     (op 960 xfy |#|)))) ; use CHOOSE instead
+
+(defun define-golog-sub ()
+  ;; TODO: Finish the implementation of =..
+  (program '(x1 x2 t1 t2 f l1)
+	   '((<- (sub x1 x2 t1 t2)
+	      (and (var t1) (= t1 t2)))
+	     (<- (sub x1 x2 t1 t2)
+	      (and (not (var t1)) (= t1 x1) (= t2 x2)))
+	     (<- (sub x1 x2 t1 t2)
+	      (and (= t1 x1)
+	       (=.. t1 (list f l1))
+	       (sub-list x1 x2 l1 l2)
+	       (=.. t2 (list f l2))))
+	     (sub-list x1 x2 nil nil)
+	     (<- (sub-list x1 x2 (cons t1 l1) (cons t2 l2))
+	      (and (sub x1 x2 t1 t2)
+	       (sub-list x1 x2 l1 l2))))))
+
+(defun define-f ()
+  (program '()
+	   '((f a)
+	     (f b))))
+
+(defun define-golog-do-nf ()
+  ;; This implements do using negation as failure.
+  (program '(e e1 e2 s s1 s2 s3 p v v1)
+	   '((<- (do (seq e1 e2) s s1)
+	      (and (do e1 s s2) (do e2 s2 s1)))
+	     (<- (do (seq e1 e2 e3) s s1)
+	      (and (do e1 s s2) (do e2 s2 s3) (do e3 s3 s1)))
+	     (<- (do (? p) s s)
+	      (call p))
+	     (<- (do (choose e1 e2) s s1)
+	      (or (do e1 s s1) (do e2 s s1)))
+	     (<- (do (if p e1 e2) s s1)
+	      (do (choose (seq (? p) e1) (seq (? (not p)) e1)) s s1))
+	     (<- (do (* e) s s1)
+	      (or (= s s1) (do (seq e (* e)) s s1)))
+	     (<- (do (while p e) s s1)
+	      (do (seq (* (seq (? p) e)) (? (not p))) s s1))
+	     (<- (do (pi v e) s s1)
+	      (and (sub v v1 e e1) (do e1 s s1)))
+	     #+(or)
+	     (<- (do e s s1)
+	      (and (proc e e1) (do e1 s s1)))
+	     (<- (do e s (do e s))
+	      (and (primitive-action e)
+	       (poss e s))))))
+
+(defun define-primitive-test-actions-01 ()
+  (program '(x s)
+	   '((primitive-action (go-to x))
+	     (<- (poss (go-to x) s)
+	      (or (= x room-1) (= x room-2)))
+	     (<- (poss (go-to x) s)
+	       (= s s0))
+	     (<- (or (= x room-1) (= x room-2) (= s s0))
+	      (poss (go-to x) s)))))
+
+(defun define-primitive-test-actions-02 ()
+  (program '(x s)
+	   '((primitive-action (go-to x))
+	     #+(or)
+	     (or (~poss (go-to x) s) (or (= x room-1) (= s s0)))
+	     (poss (go-to (next-room s)) s))))
+
+(defun define-primitive-test-actions-03 ()
+  (undefine-predicates 'adjacent 'primitive-action 'in-room 'poss)
+  (program '(x y s r1 r2 s s1 s2 s3 s4)
+	   '((adjacent room-1 room-2)
+             (adjacent room-2 room-3)
+             (adjacent room-3 room-4)
+             (adjacent room-4 room-1)
+             (~adjacent room-1 room-3)
+             (~adjacent room-2 room-4)
+             (~adjacent r1 r1)
+             (<- (adjacent r1 r2)
+              (adjacent r2 r1))
+             (<- (equal x y) (= x y))
+             (<- (equal x z)
+              (and (equal x y) (equal y z)))
+             (<- (~equal x z)
+              (and (equal x y) (~equal y z)))
+             (<- (~equal x z)
+              (and (~equal x y) (equal y z)))
+             (<- (equal x y) (equal y x))
+             (<- (adjacent x z)
+              (and (adjacent x y) (equal y z)))
+             (<- (adjacent x z)
+              (and (adjacent y z) (equal x y)))
+	     (primitive-action (go-to r1 r2))
+	     (<- (poss (go-to r1 r2) s)
+	      (and (adjacent r1 r2) (in-room r1 s)))
+	     (<- (~adjacent r1 r2)
+	      (and (~poss (go-to r1 r2) s1) (in-room r1 s1)))
+	     (<- (~in-room r1 s2)
+	      (and (~poss (go-to r1 r2) s2) (adjacent r1 r2)))
+             (in-room (start-room s0) s0)
+             (equal (start-room s0) (room-1))
+	     (<- (in-room r1 s3)
+	      (or (in-room r1 s0)
+	       (and (= s3 (do (go-to r2 r1) s4))
+		(in-room r2 s4)))))
+           :incomplete-inference t))
+
+(defun set-up-golog-tests-01 ()
+  (define-golog-sub)
+  (define-golog-do-nf)
+  (define-primitive-test-actions-01))
+
+(defun set-up-golog-tests-02 ()
+  (define-golog-sub)
+  (define-golog-do-nf)
+  (define-primitive-test-actions-02))
+
+(defun set-up-golog-tests-03 ()
+  (define-golog-sub)
+  (define-golog-do-nf)
+  (define-primitive-test-actions-03))
+
+(defun golog-test-01 ()
+  (program '(x s)
+	   '((<- (query) (poss (go-to x) s))))
+  (query))
+
+(defun golog-test-02 ()
+  (program '(x s)
+	   '((<- (query) (primitive-action (go-to x)))))
+  (query))
+
+(defun golog-test-03 ()
+  (program '(x s)
+	   '((<- (query)
+	      (and (primitive-action (go-to x)) (poss (go-to x) s)))))
+  (query))
+
+(defun golog-test-04 ()
+  (program '(x s)
+	   '((<- (query) (do (go-to x) s (do (go-to x) s)))))
+  (query))
+
+(defun golog-test-05 ()
+  (program '(x s s1)
+	   '((<- (query) (do (go-to x) s s1))))
+  (query))
+
+(defun golog-test-06 ()
+  (program '(x y s s2)
+	   '((<- (query) (do (seq (go-to x) (go-to y)) s s2))))
+  (query))
+
+(defun test-=..-01 ()
+  (program '(x)
+	   '((<- (query) (=.. (f a b) x))))
+  (query))
+
+(defun test-=..-02 ()
+  (program '(x y)
+	   '((<- (query) (=.. (f a b) (cons x y)))))
+  (query))
+
+(defun test-=..-03 ()
+  (program '(x y)
+	   '((<- (query) (=.. (f a b) (f x y)))))
+  (query))
+
+(defun test-=..-04 ()
+  (program '(x y)
+	   '((<- (query) (=.. (f a b) (g x y)))))
+  (query))
+
+(defun test-=..-05 ()
+  (program '(x y)
+	   '((<- (query) (=.. (f a b) g))))
+  (query))
+
+
+(defun golog-test-10 ()
+  (program '(r1 r2 s)
+	   '((<- (query) (adjacent r1 r2))))
+  (query))
+
+(defun golog-test-11 ()
+  (program '(r1 r2 s)
+	   '((<- (query) (in-room r1 s))))
+  (query))
+
+(defun golog-test-12 ()
+  (program '(r1 r2 s)
+	   '((<- (query) (equal r1 (start-room s0)))))
+  (query))
+
+(defun golog-test-13 ()
+  (program '(r1 r2 s)
+	   '((<- (query) (poss (go-to r1 r2) s))))
+  (query))
